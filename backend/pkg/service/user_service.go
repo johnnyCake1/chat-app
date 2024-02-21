@@ -1,16 +1,18 @@
 package service
 
-import "backend/pkg/repository"
+import (
+	"backend/pkg/model"
+	"backend/pkg/repository"
+)
 
 type UserService struct {
-	repo repository.UserRepository
+	repo *repository.UserRepository
 }
 
-func NewUserService(repo repository.UserRepository) *UserService {
+func NewUserService(repo *repository.UserRepository) *UserService {
 	return &UserService{repo: repo}
 }
 
-func (s *UserService) GetUsers() error {
-	// Logic to send a message
-	return nil
+func (us *UserService) GetAllUsers() ([]model.User, error) {
+	return us.repo.FindAll()
 }

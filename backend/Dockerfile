@@ -15,4 +15,5 @@ COPY scripts/wait-for-it.sh /app/wait-for-it.sh
 RUN chmod +x /app/wait-for-it.sh
 
 # This is to ensure that the database will always go up first before running the server:
-CMD ["./wait-for-it.sh", "postgres:5432", "--", "./main"]
+NgCMD ["./wait-for-it.sh", "postgres:5432", "--", "./wait-for-it.sh", "rabbitmq:5672", "--", "./main"]
+

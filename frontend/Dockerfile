@@ -17,6 +17,9 @@ FROM nginx:alpine
 # Copy the build output to replace the default nginx contents.
 COPY --from=build /app/build /usr/share/nginx/html
 
+# Copy your custom nginx configuration
+COPY nginx/chatapp.conf /etc/nginx/conf.d/default.conf
+
 RUN chmod -R a+r /usr/share/nginx/html && \
     chown -R nginx:nginx /usr/share/nginx/html
 
