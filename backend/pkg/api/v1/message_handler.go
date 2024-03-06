@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/streadway/amqp"
-	"log"
 )
 
 // SendMessage Sends a message to message queue
@@ -45,42 +44,4 @@ func SendToQueue(message model.Message, ch *amqp.Channel) error {
 		},
 	)
 	return err
-}
-
-func receiveFromQueue() {
-	conn, err := amqp.Dial("amqp://root:rootuser@rabbitmq/")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-
-	ch, err := conn.Channel()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer ch.Close()
-
-	msgs, err := ch.Consume(
-		config.ChatMessageQueueName, // queue
-		"",                          // consumer
-		true,                        // auto-ack
-		false,                       // exclusive
-		false,                       // no-local
-		false,                       // no-wait
-		nil,                         // args
-	)
-
-	go func() {
-		for d := range msgs {
-			var message model.Message
-			err := json.Unmarshal(d.Body, &message)
-			if err != nil {
-				log.Printf("Error parsing message: %s", err)
-				continue
-			}
-
-			// Process the message
-			log.Printf("Received a message: %s", message.Text)
-		}
-	}()
 }

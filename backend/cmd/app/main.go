@@ -5,26 +5,28 @@ import (
 	"backend/pkg/config"
 	"backend/pkg/model"
 	"backend/pkg/repository"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pressly/goose/v3"
 	"github.com/streadway/amqp"
 	"log"
 )
 
 func main() {
 	// Database connection
-	db, err := connectToDB()
+	db, err := initAndConnectToDB()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Sprintf("couldn't connect to database: %v", err))
 	}
 	defer db.Close()
 
 	// RabbitMQ connection and message queue declaration for message sending
 	conn, ch, err := connectToRabbitMQ()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Sprintf("couldn't connect to RabbitMQ: %v", err))
 	}
 	defer conn.Close()
 	// Start the message receiving service
@@ -48,9 +50,19 @@ func main() {
 	log.Fatal(app.Listen(fmt.Sprintf(":%v", config.ServerPort)))
 }
 
-func connectToDB() (*sql.DB, error) {
+func initAndConnectToDB() (*sql.DB, error) {
 	connStr := "host=postgres dbname=chatapp_db user=root password=rootuser sslmode=disable"
-	return sql.Open("postgres", connStr)
+	driverName := "postgres"
+	db, err := sql.Open(driverName, connStr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't connect to database: %v", err)
+	}
+	_ = goose.SetDialect(driverName)
+	if err := goose.RunContext(context.Background(), "up", db, "./migrations"); err != nil {
+		return nil, fmt.Errorf("couldn't run migrations: %v", err)
+	}
+	log.Println("Migrations successfully applied")
+	return db, nil
 }
 
 func connectToRabbitMQ() (*amqp.Connection, *amqp.Channel, error) {
@@ -103,11 +115,11 @@ func startMessageReceiverService() {
 		var message model.Message
 		err := json.Unmarshal(d.Body, &message)
 		if err != nil {
-			log.Printf("Error parsing message: %s", err)
+			log.Printf("Error parsing message: %v\n", err)
 			continue
 		}
 
 		// Process the message
-		log.Printf("Received a message: %s", message.Text)
+		log.Printf("Received a message!!!: %v\n", message.Text)
 	}
 }

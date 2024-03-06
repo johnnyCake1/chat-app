@@ -6,9 +6,8 @@ import (
 )
 
 type AppDependencies struct {
-	Repos             *repository.Repositories // Repositories with database connection
-	MessageConnection *amqp.Connection         // RabbitMQ connection
-	MessageChannel    *amqp.Channel            // connected RabbitMQ message channel for chat messages
+	Repos          *repository.Repositories // Repositories with database connection
+	MessageChannel *amqp.Channel            // connected RabbitMQ message channel for chat messages
 }
 
 const ServerPort = 8080
