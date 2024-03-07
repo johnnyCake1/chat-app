@@ -7,7 +7,6 @@ import (
 	"backend/pkg/repository"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/pressly/goose/v3"
@@ -30,7 +29,14 @@ func main() {
 	}
 	defer conn.Close()
 	// Start the message receiving service
-	go startMessageReceiverService()
+	var MessageHub = config.Hub{
+		Broadcast:           make(chan model.Message),
+		Register:            make(chan *config.Client),
+		Unregister:          make(chan *config.Client),
+		Clients:             make(map[*config.Client]bool),
+		MessageQueueChannel: ch,
+	}
+	go MessageHub.StartMessageConsumerService()
 
 	// Initialise all repositories
 	repos := repository.InitRepositories(db)
@@ -41,8 +47,8 @@ func main() {
 	api.SetupRoutes(
 		app,
 		&config.AppDependencies{
-			Repos:          repos,
-			MessageChannel: ch,
+			Repos:      repos,
+			MessageHub: &MessageHub,
 		},
 	)
 
@@ -85,41 +91,4 @@ func connectToRabbitMQ() (*amqp.Connection, *amqp.Channel, error) {
 	)
 
 	return conn, ch, nil
-}
-
-// startMessageReceiverService Connects to queue and listens for messages. It's a blocking function, so you should run it in a goroutine
-func startMessageReceiverService() {
-	conn, err := amqp.Dial("amqp://root:rootuser@rabbitmq/")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-
-	ch, err := conn.Channel()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer ch.Close()
-
-	msgs, err := ch.Consume(
-		config.ChatMessageQueueName, // queue
-		"",                          // consumer
-		true,                        // auto-ack
-		false,                       // exclusive
-		false,                       // no-local
-		false,                       // no-wait
-		nil,                         // args
-	)
-
-	for d := range msgs {
-		var message model.Message
-		err := json.Unmarshal(d.Body, &message)
-		if err != nil {
-			log.Printf("Error parsing message: %v\n", err)
-			continue
-		}
-
-		// Process the message
-		log.Printf("Received a message!!!: %v\n", message.Text)
-	}
 }

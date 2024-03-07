@@ -15,7 +15,7 @@ function Chat() {
         websocket.onmessage = (e) => {
             const message = JSON.parse(e.data);
             console.log("Message received:", message)
-            setMessages(prev => [...prev, message]);
+            setMessages(prev => [...prev, message.text]); // Display the 'Text' field
         };
 
         return () => {
@@ -25,7 +25,11 @@ function Chat() {
 
     const sendMessage = () => {
         if (ws && input.trim()) {
-            ws.send(JSON.stringify({ text: input }));
+            ws.send(JSON.stringify({
+                chatroomID: 1,
+                senderID: 1,
+                text: input
+            }));
             console.log("Message sent:", input)
             setInput(''); // Clear input after send
         }
@@ -35,7 +39,7 @@ function Chat() {
         <div>
             <ul>
                 {messages.map((msg, index) => (
-                    <li key={index}>{msg.text}</li>
+                    <li key={index}>{msg}</li>
                 ))}
             </ul>
             <input

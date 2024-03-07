@@ -28,7 +28,7 @@ func SetupRoutes(app *fiber.App, appDependencies *config.AppDependencies) {
 		return fiber.ErrUpgradeRequired
 	})
 	// WebSocket route
-	app.Get("/ws", websocket.New(WebSocketHandler(appDependencies.MessageChannel)))
+	app.Get("/ws", websocket.New(WebSocketHandler(appDependencies.MessageHub)))
 	app.Get("/", func(c *fiber.Ctx) error { // solely for server proxy testing
 		return c.SendString("Chat app root")
 	})
@@ -47,6 +47,6 @@ func SetupRoutes(app *fiber.App, appDependencies *config.AppDependencies) {
 	api.Get("/user/:id", v1.GetUser(appDependencies.Repos.UserRepo))
 	api.Delete("/user/:id", v1.GetUser(appDependencies.Repos.UserRepo))
 	// Message routes
-	api.Post("/message", v1.SendMessage(appDependencies.MessageChannel))
+	api.Post("/message", v1.SendMessage(appDependencies.MessageHub.MessageQueueChannel))
 
 }
