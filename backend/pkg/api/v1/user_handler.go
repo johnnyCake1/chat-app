@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
+	"log"
+	"strconv"
 	"time"
 )
 
@@ -17,7 +19,7 @@ func GetUsers(repo *repository.UserRepository) fiber.Handler {
 		userService := service.NewUserService(repo)
 		users, err := userService.GetAllUsers()
 		if err != nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "User not found"})
 		}
 		return c.JSON(users)
 	}
@@ -26,7 +28,18 @@ func GetUsers(repo *repository.UserRepository) fiber.Handler {
 // GetUser gets a specific user with given id
 func GetUser(repo *repository.UserRepository) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		return c.SendString("user")
+		userID, err := strconv.ParseUint(c.Params("id"), 10, 64)
+		if err != nil {
+			// If parsing fails, return a 400 Bad Request response
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid user ID"})
+		}
+
+		user, err := repo.FindByID(uint(userID))
+		if err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "User not found"})
+		}
+
+		return c.JSON(user)
 	}
 }
 
@@ -47,7 +60,7 @@ func RegisterHandler(repo *repository.UserRepository) fiber.Handler {
 			})
 		}
 		// Save new user to DB
-		userID, err := repo.AddNewUser(model.User{
+		user, err := repo.AddNewUser(model.User{
 			Nickname:     request.Nickname,
 			PasswordHash: string(hashedPassword),
 			Email:        request.Email,
@@ -59,7 +72,7 @@ func RegisterHandler(repo *repository.UserRepository) fiber.Handler {
 		}
 
 		// generate a jwt token
-		token, err := middleware.GenerateToken(userID)
+		token, err := middleware.GenerateToken(user.ID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"message": fmt.Sprintf("Couldn't register the new user: %v", err),
@@ -74,7 +87,7 @@ func RegisterHandler(repo *repository.UserRepository) fiber.Handler {
 		}
 		c.Cookie(&cookie)
 
-		return c.JSON(fiber.Map{"token": token})
+		return c.JSON(user)
 	}
 
 }
@@ -92,16 +105,16 @@ func LoginHandler(repo *repository.UserRepository) fiber.Handler {
 		// Retrieve user from DB and check password...
 		user, err := repo.FindByEmail(request.Email)
 		if err != nil {
-			if user == nil {
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-					"message": fmt.Sprintf("Couldn't login: User with email %v not found", request.Email),
-				})
-			}
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"message": fmt.Sprintf("Couldn't login: %v", err),
 			})
 		}
-
+		if user == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"message": fmt.Sprintf("Couldn't login: User with email %v not found", request.Email),
+			})
+		}
+		log.Printf("Login username: %v and paswwrod: %v", user.Email, user.PasswordHash)
 		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(request.Password)); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"message": fmt.Sprintf("Couldn't login: %v", err),
@@ -124,7 +137,7 @@ func LoginHandler(repo *repository.UserRepository) fiber.Handler {
 		}
 		c.Cookie(&cookie)
 
-		return c.JSON(fiber.Map{"token": token})
+		return c.JSON(user)
 	}
 }
 

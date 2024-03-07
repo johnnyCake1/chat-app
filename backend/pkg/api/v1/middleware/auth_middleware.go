@@ -23,19 +23,18 @@ func GenerateToken(userID uint) (string, error) {
 	return token, nil
 }
 
-// Protect is a middleware to protect routes
+// Protect is a middleware to protect routes from unauthorised access
 func Protect() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		//Token validation logic
-		token := c.Cookies("token")
+		token := c.Cookies("jwt")
 		_, err := jwt.ParseWithClaims(token, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 			return []byte(jwtSecret), nil
 		})
 
 		if err != nil {
-			c.Status(fiber.StatusUnauthorized)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Couldn't login: unauthorised",
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Unauthorised. Please login/register first",
 			})
 		}
 

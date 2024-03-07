@@ -12,10 +12,12 @@ type UserRepository struct {
 	db *sql.DB
 }
 
+// NewUserRepository creates a new instance of UserRepository with the given database connection.
 func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
+// FindByID finds a user by their ID and returns the user details. Returns nil if user is not found.
 func (r *UserRepository) FindByID(id uint) (*model.User, error) {
 	var user model.User
 	query := `SELECT id, nickname, email, password_hash, avatar_url FROM users WHERE id = $1;`
@@ -23,7 +25,7 @@ func (r *UserRepository) FindByID(id uint) (*model.User, error) {
 
 	err := row.Scan(&user.ID, &user.Nickname, &user.Email, &user.PasswordHash, &user.AvatarURL)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -32,6 +34,7 @@ func (r *UserRepository) FindByID(id uint) (*model.User, error) {
 	return &user, nil
 }
 
+// FindByEmail finds a user by their email address and returns the user details. Returns nil if user is not found.
 func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
 	var user model.User
 	query := `SELECT id, nickname, email, password_hash, avatar_url FROM users WHERE email = $1;`
@@ -48,9 +51,10 @@ func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
 	return &user, nil
 }
 
+// FindAll fetches all users from the database and returns a slice of user models.
 func (r *UserRepository) FindAll() ([]model.User, error) {
 	var users []model.User
-	rows, err := r.db.Query("SELECT * FROM users;")
+	rows, err := r.db.Query("SELECT id, nickname, email, password_hash, avatar_url FROM users;")
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +63,7 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 	// Iterate over the rows
 	for rows.Next() {
 		var user model.User
-		err := rows.Scan(&user.ID, &user.Nickname, &user.Email, &user.PasswordHash, &user.AvatarURL)
+		err := rows.Scan(&user.ID, &user.Nickname, &user.Email, &user.AvatarURL)
 		if err != nil {
 			return nil, err
 		}
@@ -74,17 +78,19 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 	return users, nil
 }
 
-func (r *UserRepository) AddNewUser(user model.User) (uint, error) {
+// AddNewUser adds a new user to the database and returns the newly created user.
+func (r *UserRepository) AddNewUser(user model.User) (model.User, error) {
 	query := `
 		INSERT INTO users (nickname, email, password_hash, avatar_url) 
 		VALUES ($1, $2, $3, $4)
-		RETURNING id;
+		RETURNING id, nickname, email, password_hash, avatar_url, created_at;
 	`
-	var userID uint
-	err := r.db.QueryRow(query, user.Nickname, user.Email, user.PasswordHash, user.AvatarURL).Scan(&userID)
+	var newUser model.User
+	err := r.db.QueryRow(query, user.Nickname, user.Email, user.PasswordHash, user.AvatarURL).
+		Scan(&newUser.ID, &newUser.Nickname, &newUser.Email, &newUser.PasswordHash, &newUser.AvatarURL, &newUser.CreatedAt)
 	if err != nil {
-		return 0, fmt.Errorf("failed to add a new user: %v", err)
+		return model.User{}, fmt.Errorf("failed to add a new user: %v", err)
 	}
 
-	return userID, nil
+	return newUser, nil
 }

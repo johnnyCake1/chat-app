@@ -14,9 +14,11 @@ func SetupRoutes(app *fiber.App, appDependencies *config.AppDependencies) {
 	app.Use(logger.New())
 	// Enabling all origins only for development purposes!
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept",
-		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH",
+		AllowOrigins:     "http://localhost,http://localhost:3000,http://frontend:3000",
+		AllowCredentials: true,
+		ExposeHeaders:    "Set-Cookie",
+		AllowHeaders:     "Content-Type, Authorization",
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 	}))
 	app.Use("/ws", func(c *fiber.Ctx) error {
 		// IsWebSocketUpgrade returns true if the client
@@ -44,7 +46,7 @@ func SetupRoutes(app *fiber.App, appDependencies *config.AppDependencies) {
 	api.Post("/logout", v1.LogoutHandler())
 	// User routes
 	api.Get("/user", middleware.Protect(), v1.GetUsers(appDependencies.Repos.UserRepo))
-	api.Get("/user/:id", v1.GetUser(appDependencies.Repos.UserRepo))
+	api.Get("/user/:id", middleware.Protect(), v1.GetUser(appDependencies.Repos.UserRepo))
 	api.Delete("/user/:id", v1.GetUser(appDependencies.Repos.UserRepo))
 	// Message routes
 	api.Post("/message", v1.SendMessage(appDependencies.MessageHub.MessageQueueChannel))
