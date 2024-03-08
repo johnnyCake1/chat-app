@@ -3,14 +3,15 @@ package api
 import (
 	v1 "backend/pkg/api/v1"
 	"backend/pkg/api/v1/middleware"
-	"backend/pkg/config"
+	"backend/pkg/consumer"
+	"backend/pkg/service"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/websocket/v2"
 )
 
-func SetupRoutes(app *fiber.App, appDependencies *config.AppDependencies) {
+func SetupRoutes(app *fiber.App, services *service.Services, messageHub *consumer.MessageHub) {
 	app.Use(logger.New())
 	// Enabling all origins only for development purposes!
 	app.Use(cors.New(cors.Config{
@@ -30,19 +31,21 @@ func SetupRoutes(app *fiber.App, appDependencies *config.AppDependencies) {
 		return fiber.ErrUpgradeRequired
 	})
 	// WebSocket route
-	app.Get("/ws", websocket.New(ClientWebSocketConnectionHandler(appDependencies.MessageHub)))
+	app.Get("/ws", websocket.New(ClientWebSocketConnectionHandler(messageHub)))
 	app.Get("/", func(c *fiber.Ctx) error { // solely for server proxy testing
 		return c.SendString("Chat app root")
 	})
 	// Grouping API version 1
 	api := app.Group("/api/v1")
 	// Auth routes
-	api.Post("/register", v1.RegisterHandler(appDependencies.Repos.UserRepo))
-	api.Post("/login", v1.LoginHandler(appDependencies.Repos.UserRepo))
+	api.Post("/register", v1.RegisterHandler(services.UserService))
+	api.Post("/login", v1.LoginHandler(services.UserService))
 	api.Post("/logout", v1.LogoutHandler())
 	// User routes
-	api.Get("/users", middleware.Protect(), v1.GetUsers(appDependencies.Repos.UserRepo))
-	api.Get("/users/search", middleware.Protect(), v1.SearchUsers(appDependencies.Repos.UserRepo))
-	api.Get("/users/:id", middleware.Protect(), v1.GetUser(appDependencies.Repos.UserRepo))
-	api.Delete("/users/:id", middleware.Protect(), v1.GetUser(appDependencies.Repos.UserRepo))
+	api.Get("/users", middleware.Protect(), v1.GetUsers(services.UserService))
+	api.Get("/users/search", middleware.Protect(), v1.SearchUsers(services.UserService))
+	api.Get("/users/:id", middleware.Protect(), v1.GetUser(services.UserService))
+	api.Delete("/users/:id", middleware.Protect(), v1.GetUser(services.UserService))
+	// Chatrooms
+	api.Get("chatrooms", middleware.Protect(), v1.GetUser(services.UserService))
 }

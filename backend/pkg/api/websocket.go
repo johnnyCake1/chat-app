@@ -2,6 +2,7 @@ package api
 
 import (
 	"backend/pkg/config"
+	"backend/pkg/consumer"
 	"backend/pkg/model"
 	"encoding/json"
 	"github.com/gofiber/websocket/v2"
@@ -12,9 +13,9 @@ import (
 // TODO: implement user identification on each request. Also add chatrooms to the clients that they are subscribed to. For that we will also need the connected user identity to see in what chats he is a participant
 
 // ClientWebSocketConnectionHandler handles client connection to the server websocket.
-func ClientWebSocketConnectionHandler(messageHub *config.Hub) func(c *websocket.Conn) {
+func ClientWebSocketConnectionHandler(messageHub *consumer.MessageHub) func(c *websocket.Conn) {
 	return func(c *websocket.Conn) {
-		client := &config.Client{Conn: c, ChatIDs: make(map[uint]bool), Send: make(chan []byte, 256)}
+		client := &consumer.Client{Conn: c, ChatIDs: make(map[uint]bool)}
 		messageHub.Register <- client
 
 		defer func() {

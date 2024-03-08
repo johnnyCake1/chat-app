@@ -1,21 +1,23 @@
-package config
+package consumer
 
 import (
+	"backend/pkg/config"
 	"backend/pkg/model"
-	"backend/pkg/repository"
 	"encoding/json"
 	"github.com/gofiber/websocket/v2"
 	"github.com/streadway/amqp"
 	"log"
 )
 
+// Client is for storing clients connections and keeping track of chats that the client is subscribed to
 type Client struct {
 	Conn    *websocket.Conn
 	ChatIDs map[uint]bool // Maps to keep track of which chat IDs the client is subscribed to
-	Send    chan []byte   // Channel (buffered) for sending messages to the client
+	//Send    chan []byte   // Channel (buffered) for sending messages to the client // We actually use MessageHub.MessageQueueChannel RMQ channel to publish the message and use the Conn websocket connection for broadcasting
 }
 
-type Hub struct {
+// MessageHub is for managing clients connections and also publishing, consuming and broadcasting chat messages
+type MessageHub struct {
 	Clients             map[*Client]bool   // Keeps track of all connected Clients
 	Register            chan *Client       // Channel for registering new clients
 	Unregister          chan *Client       // Channel for unregistering clients
@@ -23,14 +25,8 @@ type Hub struct {
 	MessageQueueChannel *amqp.Channel      // connected RabbitMQ message channel for publishing/consuming chat messages
 }
 
-type AppDependencies struct {
-	Repos               *repository.Repositories // Repositories with database connection
-	MessageQueueChannel *amqp.Channel            // connected RabbitMQ message channel for chat messages
-	MessageHub          *Hub                     // MessageHub is for managing clients connections and also publishing, consuming and broadcasting chat messages
-}
-
 // StartMessageConsumerService Connects to message queue and consumes messages to broadcast them. It also listens for client registration/unregistration to add/delete the clients to broadcast.  It's a blocking function, so you should run it in a goroutine
-func (h *Hub) StartMessageConsumerService() {
+func (h *MessageHub) StartMessageConsumerService() {
 	conn, err := amqp.Dial("amqp://root:rootuser@rabbitmq/")
 	if err != nil {
 		log.Fatal(err)
@@ -44,13 +40,13 @@ func (h *Hub) StartMessageConsumerService() {
 	defer ch.Close()
 
 	msgs, err := ch.Consume(
-		ChatMessageQueueName, // queue
-		"",                   // consumer
-		true,                 // auto-ack
-		false,                // exclusive
-		false,                // no-local
-		false,                // no-wait
-		nil,                  // args
+		config.ChatMessageQueueName, // queue
+		"",                          // consumer
+		true,                        // auto-ack
+		false,                       // exclusive
+		false,                       // no-local
+		false,                       // no-wait
+		nil,                         // args
 	)
 	if err != nil {
 		log.Fatalf("Error consuming messages from Message Queue: %v", err)
@@ -64,9 +60,8 @@ func (h *Hub) StartMessageConsumerService() {
 		case client := <-h.Unregister:
 			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
-				close(client.Send)
 			}
-		//case message := <-h.broadcast: {log.Printf("Message received for broadcasting: %v", message)} // We could also directly use broadcast channel instead of consuming from a message queue
+		//case message := <-h.broadcast: {log.Printf("Message received for broadcasting: %v", message)} // We could also directly consume from a broadcast channel instead of consuming from a message queue
 		case d := <-msgs:
 			// debug log
 			log.Printf("Message consumed: %v", d.Body)
@@ -95,9 +90,3 @@ func (h *Hub) StartMessageConsumerService() {
 		}
 	}
 }
-
-const ServerPort = 8080
-
-const ChatMessageQueueName = "chat_messages"
-
-const ChatMessageRoutingKey = ChatMessageQueueName

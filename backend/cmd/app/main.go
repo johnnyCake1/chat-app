@@ -3,8 +3,10 @@ package main
 import (
 	"backend/pkg/api"
 	"backend/pkg/config"
+	"backend/pkg/consumer"
 	"backend/pkg/model"
 	"backend/pkg/repository"
+	"backend/pkg/service"
 	"context"
 	"database/sql"
 	"fmt"
@@ -29,27 +31,27 @@ func main() {
 	}
 	defer conn.Close()
 	// Start the message receiving service
-	var MessageHub = config.Hub{
+	var MessageHub = &consumer.MessageHub{
 		Broadcast:           make(chan model.Message),
-		Register:            make(chan *config.Client),
-		Unregister:          make(chan *config.Client),
-		Clients:             make(map[*config.Client]bool),
+		Register:            make(chan *consumer.Client),
+		Unregister:          make(chan *consumer.Client),
+		Clients:             make(map[*consumer.Client]bool),
 		MessageQueueChannel: ch,
 	}
 	go MessageHub.StartMessageConsumerService()
 
 	// Initialise all repositories
 	repos := repository.InitRepositories(db)
+	// Initialise all services
+	services := service.InitServices(repos)
 
 	app := fiber.New()
 
-	// Setup routes and pass dependencies
+	// Setup routes and inject dependencies
 	api.SetupRoutes(
 		app,
-		&config.AppDependencies{
-			Repos:      repos,
-			MessageHub: &MessageHub,
-		},
+		services,
+		MessageHub,
 	)
 
 	// Start server on indicated port
@@ -57,12 +59,14 @@ func main() {
 }
 
 func initAndConnectToDB() (*sql.DB, error) {
+	// connect to postgres
 	connStr := "host=postgres dbname=chatapp_db user=root password=rootuser sslmode=disable"
 	driverName := "postgres"
 	db, err := sql.Open(driverName, connStr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to database: %v", err)
 	}
+	// apply migrations
 	_ = goose.SetDialect(driverName)
 	if err := goose.RunContext(context.Background(), "up", db, "./migrations"); err != nil {
 		return nil, fmt.Errorf("couldn't run migrations: %v", err)

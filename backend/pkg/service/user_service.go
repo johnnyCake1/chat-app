@@ -6,18 +6,32 @@ import (
 )
 
 type UserService struct {
-	repo *repository.UserRepository
+	userRepo *repository.UserRepository
 }
 
 func NewUserService(repo *repository.UserRepository) *UserService {
-	return &UserService{repo: repo}
+	return &UserService{userRepo: repo}
 }
 
 func (us *UserService) GetAllUsers() ([]model.User, error) {
-	return us.repo.FindAll()
+	return us.userRepo.FindAll()
+}
+
+// GetUserByID finds a user by their ID and returns the user details. Returns nil if user is not found.
+func (us *UserService) GetUserByID(userID uint) (*model.User, error) {
+	return us.userRepo.FindByID(userID)
+}
+
+// GetUserByEmail finds a user by their email address and returns the user details. Returns nil if user is not found.
+func (us *UserService) GetUserByEmail(email string) (*model.User, error) {
+	return us.userRepo.FindByEmail(email)
 }
 
 // GetUsersBySearchTerm finds those users whose nickname or email contains the search term. Returns empty array if no user is found.
 func (us *UserService) GetUsersBySearchTerm(searchTerm string) ([]model.User, error) {
-	return us.repo.FindUserBySearchTerm(searchTerm)
+	return us.userRepo.FindUserBySearchTerm(searchTerm)
+}
+
+func (us *UserService) CreateNewUser(user model.User) (model.User, error) {
+	return us.userRepo.AddNewUser(user)
 }
