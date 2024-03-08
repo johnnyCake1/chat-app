@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
-	"log"
 	"strconv"
 	"time"
 )
@@ -30,16 +29,39 @@ func GetUser(repo *repository.UserRepository) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		userID, err := strconv.ParseUint(c.Params("id"), 10, 64)
 		if err != nil {
-			// If parsing fails, return a 400 Bad Request response
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid user ID"})
 		}
 
 		user, err := repo.FindByID(uint(userID))
 		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": fmt.Sprintf("Couldn't query the user from database: %v", err)})
+		}
+		if user == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "User not found"})
 		}
 
 		return c.JSON(user)
+	}
+}
+
+// SearchUsers fetches all users containing the searchTerm in their email or nickname
+func SearchUsers(repo *repository.UserRepository) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Parse the search term from the query parameter
+		searchTerm := c.Query("searchTerm")
+
+		// Check if searchTerm is empty
+		if searchTerm == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Empty search term"})
+		}
+
+		// Fetch users from the repository based on the search term
+		users, err := repo.FindUserBySearchTerm(searchTerm)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": fmt.Sprintf("Error searching users: %v", err)})
+		}
+
+		return c.JSON(users)
 	}
 }
 
@@ -71,7 +93,7 @@ func RegisterHandler(repo *repository.UserRepository) fiber.Handler {
 			})
 		}
 
-		// generate a jwt token
+		// Generate a jwt token
 		token, err := middleware.GenerateToken(user.ID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -79,6 +101,7 @@ func RegisterHandler(repo *repository.UserRepository) fiber.Handler {
 			})
 		}
 
+		// Store the token into client's Cookie
 		cookie := fiber.Cookie{
 			Name:     "jwt",
 			Value:    token,
@@ -114,7 +137,6 @@ func LoginHandler(repo *repository.UserRepository) fiber.Handler {
 				"message": fmt.Sprintf("Couldn't login: User with email %v not found", request.Email),
 			})
 		}
-		log.Printf("Login username: %v and paswwrod: %v", user.Email, user.PasswordHash)
 		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(request.Password)); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"message": fmt.Sprintf("Couldn't login: %v", err),

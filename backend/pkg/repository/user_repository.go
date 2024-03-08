@@ -34,6 +34,44 @@ func (r *UserRepository) FindByID(id uint) (*model.User, error) {
 	return &user, nil
 }
 
+// FindUserBySearchTerm finds users whose nickname or email contains the search term (case-insensitive), orders them by relevance, and limits the number of search results.
+func (r *UserRepository) FindUserBySearchTerm(searchTerm string) ([]model.User, error) {
+	var users []model.User
+	query := `
+        SELECT id, nickname, email, password_hash, avatar_url, created_at
+		FROM users 
+		WHERE nickname ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%'
+		ORDER BY CASE 
+			WHEN email ILIKE $1 THEN 1  -- Matches email exactly
+			WHEN email ILIKE '%' || $1 || '%' THEN 2  -- Matches email partially
+			WHEN nickname ILIKE '%' || $1 || '%' THEN 3  -- Matches nickname partially
+			ELSE 4  -- No match
+		END
+		LIMIT 10;  -- Number of search results limit
+    `
+	rows, err := r.db.Query(query, searchTerm)
+	if err != nil {
+		return []model.User{}, err
+	}
+	defer rows.Close()
+
+	// Iterate over the rows
+	for rows.Next() {
+		var user model.User
+		err := rows.Scan(&user.ID, &user.Nickname, &user.Email, &user.PasswordHash, &user.AvatarURL, &user.CreatedAt)
+		if err != nil {
+			return []model.User{}, err
+		}
+		users = append(users, user)
+	}
+
+	if err = rows.Err(); err != nil {
+		return []model.User{}, err
+	}
+
+	return users, nil
+}
+
 // FindByEmail finds a user by their email address and returns the user details. Returns nil if user is not found.
 func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
 	var user model.User
@@ -70,7 +108,6 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 		users = append(users, user)
 	}
 
-	// Check for errors from iterating over rows
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
