@@ -38,7 +38,7 @@ const LoginPage = () => {
       if (response.ok) {
         const userData = await response.json();
         console.log("User successfully logged in:", userData);
-        navigate('/chat')
+        navigate('/')
       } else {
         const errorData = await response.json();
         setErrorMessage(errorData.message);

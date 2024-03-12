@@ -6,13 +6,16 @@ import (
 
 // Services contains all the service structs
 type Services struct {
-	UserService *UserService
+	UserService     *UserService
+	ChatroomService *ChatroomService
 }
 
 // InitServices initialises all the services with given repositories with database connection
 func InitServices(repositories *repository.Repositories) *Services {
 	userService := NewUserService(repositories.UserRepo)
+	chatroomService := NewChatroomService(repositories.ChatroomRepo)
 	return &Services{
-		UserService: userService,
+		UserService:     userService,
+		ChatroomService: chatroomService,
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"backend/pkg/api"
 	"backend/pkg/config"
 	"backend/pkg/consumer"
-	"backend/pkg/model"
 	"backend/pkg/repository"
 	"backend/pkg/service"
 	"context"
@@ -30,14 +29,8 @@ func main() {
 		log.Fatal(fmt.Sprintf("couldn't connect to RabbitMQ: %v", err))
 	}
 	defer conn.Close()
-	// Start the message receiving service
-	var MessageHub = &consumer.MessageHub{
-		Broadcast:           make(chan model.Message),
-		Register:            make(chan *consumer.Client),
-		Unregister:          make(chan *consumer.Client),
-		Clients:             make(map[*consumer.Client]bool),
-		MessageQueueChannel: ch,
-	}
+	// Start the message consumer service
+	MessageHub := consumer.NewMessageHub(ch)
 	go MessageHub.StartMessageConsumerService()
 
 	// Initialise all repositories

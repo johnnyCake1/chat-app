@@ -25,6 +25,16 @@ type MessageHub struct {
 	MessageQueueChannel *amqp.Channel      // connected RabbitMQ message channel for publishing/consuming chat messages
 }
 
+func NewMessageHub(messageQueueChannel *amqp.Channel) *MessageHub {
+	return &MessageHub{
+		Broadcast:           make(chan model.Message),
+		Register:            make(chan *Client),
+		Unregister:          make(chan *Client),
+		Clients:             make(map[*Client]bool),
+		MessageQueueChannel: messageQueueChannel,
+	}
+}
+
 // StartMessageConsumerService Connects to message queue and consumes messages to broadcast them. It also listens for client registration/unregistration to add/delete the clients to broadcast.  It's a blocking function, so you should run it in a goroutine
 func (h *MessageHub) StartMessageConsumerService() {
 	conn, err := amqp.Dial("amqp://root:rootuser@rabbitmq/")

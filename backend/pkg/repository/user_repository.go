@@ -47,7 +47,7 @@ func (r *UserRepository) FindUserBySearchTerm(searchTerm string) ([]model.User, 
 			WHEN nickname ILIKE '%' || $1 || '%' THEN 3  -- Matches nickname partially
 			ELSE 4  -- No match
 		END
-		LIMIT 10;  -- Number of search results limit
+		LIMIT 10;
     `
 	rows, err := r.db.Query(query, searchTerm)
 	if err != nil {
@@ -55,7 +55,6 @@ func (r *UserRepository) FindUserBySearchTerm(searchTerm string) ([]model.User, 
 	}
 	defer rows.Close()
 
-	// Iterate over the rows
 	for rows.Next() {
 		var user model.User
 		err := rows.Scan(&user.ID, &user.Nickname, &user.Email, &user.PasswordHash, &user.AvatarURL, &user.CreatedAt)

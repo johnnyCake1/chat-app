@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Form, FormControl, ListGroup } from 'react-bootstrap';
 import { API_URL } from '../constants';
+import { useNavigate } from 'react-router-dom';
 
 function SearchBar() {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState([]);
+    const navigate = useNavigate();
     let timeout;
 
     const handleSearch = async (event) => {
@@ -29,6 +31,8 @@ function SearchBar() {
                     const searchData = await response.json();
                     console.log("Search result:", searchData);
                     setSearchResults(searchData);
+                } else if (response.status === 401) {
+                    navigate('/login')
                 }
             } catch (error) {
                 console.error('Error searching users:', error);

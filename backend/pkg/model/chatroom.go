@@ -5,10 +5,10 @@ import (
 )
 
 type Chatroom struct {
-	ID           int
-	IsGroup      bool
-	GroupName    string
-	CreatedAt    time.Time
-	Messages     []Message
-	Participants []User
+	ID           int       `json:"id"`
+	IsGroup      bool      `json:"isGroup"`
+	GroupName    string    `json:"groupName"`
+	CreatedAt    time.Time `json:"createdAt"`
+	Messages     []Message `json:"messages"`
+	Participants []User    `json:"participants"`
 }

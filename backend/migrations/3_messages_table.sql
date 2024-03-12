@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS messages (
     chatroom_id INT NOT NULL,
     sender_user_id INT NOT NULL,
     text TEXT NOT NULL,
+    attachment_url TEXT,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     viewed BOOLEAN DEFAULT FALSE,
     deleted BOOLEAN DEFAULT FALSE,
