@@ -13,6 +13,14 @@ import (
 )
 
 // RegisterHandler handles user registration
+// @Summary Register a new user
+// @Description Register a new user with the provided credentials
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param body body model.RegistrationRequest true "User registration request"
+// @Success 201 {object} model.User
+// @Router /api/v1/register [post]
 func RegisterHandler(userService *service.UserService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		request := new(model.RegistrationRequest)
@@ -63,6 +71,14 @@ func RegisterHandler(userService *service.UserService) fiber.Handler {
 }
 
 // LoginHandler handles user login
+// @Summary Log in a user
+// @Description Log in a user with the provided credentials
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param body body model.LoginRequest true "User login request"
+// @Success 200 {object} model.User
+// @Router /api/v1/login [post]
 func LoginHandler(userService *service.UserService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		request := new(model.LoginRequest)
@@ -111,6 +127,11 @@ func LoginHandler(userService *service.UserService) fiber.Handler {
 }
 
 // LogoutHandler handles user logout
+// @Summary Log out a user
+// @Description Log out the currently authenticated user
+// @Tags Authentication
+// @Success 200 {object} map[string]string
+// @Router /api/v1/logout [post]
 func LogoutHandler() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		cookie := fiber.Cookie{
@@ -127,6 +148,13 @@ func LogoutHandler() fiber.Handler {
 }
 
 // ValidateTokenHandler handles token validation. It validates the token provided in the query parameter. Otherwise, validates the token provided in the cookie.
+// @Summary Validate a JWT token
+// @Description Validate the JWT token provided in the query parameter or cookie
+// @Tags Authentication
+// @Param token query string false "JWT token"
+// @Success 200
+// @Failure 401 {object} map[string]string
+// @Router /api/v1/validateToken [get]
 func ValidateTokenHandler() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		token := c.Query("token")

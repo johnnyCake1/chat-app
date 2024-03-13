@@ -1,0 +1,307 @@
+definitions:
+  model.Chatroom:
+    properties:
+      createdAt:
+        type: string
+      groupName:
+        type: string
+      id:
+        type: integer
+      isGroup:
+        type: boolean
+      messages:
+        items:
+          $ref: '#/definitions/model.Message'
+        type: array
+      participants:
+        items:
+          $ref: '#/definitions/model.User'
+        type: array
+    type: object
+  model.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  model.Message:
+    properties:
+      attachmentURL:
+        type: string
+      chatRoomID:
+        type: integer
+      deleted:
+        type: boolean
+      id:
+        type: integer
+      isRead:
+        type: boolean
+      senderID:
+        type: integer
+      text:
+        type: string
+      timeStamp:
+        type: string
+      viewed:
+        type: boolean
+    type: object
+  model.RegistrationRequest:
+    properties:
+      email:
+        type: string
+      nickname:
+        type: string
+      password:
+        type: string
+    type: object
+  model.User:
+    properties:
+      avatarURL:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      nickname:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /api/v1/chatrooms/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve information about a chatroom, including participants and
+        messages
+      parameters:
+      - description: Chatroom ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Chatroom'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get the chatroom information
+      tags:
+      - Chatrooms
+  /api/v1/login:
+    post:
+      consumes:
+      - application/json
+      description: Log in a user with the provided credentials
+      parameters:
+      - description: User login request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+      summary: Log in a user
+      tags:
+      - Authentication
+  /api/v1/logout:
+    post:
+      description: Log out the currently authenticated user
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Log out a user
+      tags:
+      - Authentication
+  /api/v1/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user with the provided credentials
+      parameters:
+      - description: User registration request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.RegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/model.User'
+      summary: Register a new user
+      tags:
+      - Authentication
+  /api/v1/users:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all users
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.User'
+            type: array
+      summary: Get all users
+      tags:
+      - Users
+  /api/v1/users/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve information about a user by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a user
+      tags:
+      - Users
+  /api/v1/users/{id}/chatrooms:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all chatrooms where a user is a participant
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Chatroom'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get chatrooms of a user
+      tags:
+      - Chatrooms
+  /api/v1/users/search:
+    get:
+      consumes:
+      - application/json
+      description: Search for users by email or nickname containing the provided search
+        term
+      parameters:
+      - description: Search term
+        in: query
+        name: searchTerm
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.User'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Search users
+      tags:
+      - Users
+  /api/v1/validateToken:
+    get:
+      description: Validate the JWT token provided in the query parameter or cookie
+      parameters:
+      - description: JWT token
+        in: query
+        name: token
+        type: string
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Validate a JWT token
+      tags:
+      - Authentication
+  /ws:
+    get:
+      description: Handle client connections to the WebSocket server
+      responses:
+        "101":
+          description: Switching Protocols
+      summary: Handle WebSocket connection
+      tags:
+      - WebSocket
+swagger: "2.0"

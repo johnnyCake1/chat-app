@@ -2,6 +2,7 @@ package main
 
 import (
 	"backend/pkg/api"
+	_ "backend/pkg/api/v1/docs"
 	"backend/pkg/config"
 	"backend/pkg/consumer"
 	"backend/pkg/repository"

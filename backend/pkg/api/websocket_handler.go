@@ -13,6 +13,11 @@ import (
 // TODO: implement user identification on each request. Also add chatrooms to the clients that they are subscribed to. For that we will also need the connected user identity to see in what chats he is a participant
 
 // ClientWebSocketConnectionHandler handles client connection to the server websocket.
+// @Summary Handle WebSocket connection
+// @Description Handle client connections to the WebSocket server
+// @Tags WebSocket
+// @Success 101
+// @Router /ws [get]
 func ClientWebSocketConnectionHandler(messageHub *consumer.MessageHub) func(c *websocket.Conn) {
 	return func(c *websocket.Conn) {
 		client := &consumer.Client{Conn: c, ChatIDs: make(map[uint]bool)}
