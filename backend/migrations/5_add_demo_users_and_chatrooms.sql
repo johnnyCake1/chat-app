@@ -36,13 +36,13 @@ CREATE TABLE IF NOT EXISTS chatroom_participants (
      PRIMARY KEY (chatroom_id, user_id)
 );
 
--- Insert users
+-- Insert users. Hashed passwords' value is 'user123'
 INSERT INTO users (nickname, email, password_hash, avatar_url, created_at) VALUES
-    ('user1', 'user1@example.com', 'password_hash1', 'avatar1.jpg', NOW()),
-    ('user2', 'user2@example.com', 'password_hash2', 'avatar2.jpg', NOW()),
-    ('user3', 'user3@example.com', 'password_hash3', 'avatar3.jpg', NOW()),
-    ('user4', 'user4@example.com', 'password_hash4', 'avatar4.jpg', NOW()),
-    ('user5', 'user5@example.com', 'password_hash5', 'avatar5.jpg', NOW());
+    ('user1', 'user1@example.com', '$2a$10$eTl74BAMFMtOIVXPecQt8.FCYb2E5uU0W1aziaFG9p2wP4jhSdNh.', 'avatar1.jpg', NOW()),
+    ('user2', 'user2@example.com', '$2a$10$eTl74BAMFMtOIVXPecQt8.FCYb2E5uU0W1aziaFG9p2wP4jhSdNh.', 'avatar2.jpg', NOW()),
+    ('user3', 'user3@example.com', '$2a$10$eTl74BAMFMtOIVXPecQt8.FCYb2E5uU0W1aziaFG9p2wP4jhSdNh.', 'avatar3.jpg', NOW()),
+    ('user4', 'user4@example.com', '$2a$10$eTl74BAMFMtOIVXPecQt8.FCYb2E5uU0W1aziaFG9p2wP4jhSdNh.', 'avatar4.jpg', NOW()),
+    ('user5', 'user5@example.com', '$2a$10$eTl74BAMFMtOIVXPecQt8.FCYb2E5uU0W1aziaFG9p2wP4jhSdNh.', 'avatar5.jpg', NOW());
 
 -- Insert chatrooms
 INSERT INTO chatrooms (is_group, group_name, created_at) VALUES

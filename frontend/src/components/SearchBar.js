@@ -2,17 +2,19 @@ import React, { useState } from 'react';
 import { Form, FormControl, ListGroup } from 'react-bootstrap';
 import { API_URL } from '../constants';
 import { useNavigate } from 'react-router-dom';
+import useLocalStorageState from '../util/userLocalStorage';
 
-function SearchBar() {
+function SearchBar({ onSelect }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState([]);
+    const [token,] = useLocalStorageState('token');
     const navigate = useNavigate();
     let timeout;
 
     const handleSearch = async (event) => {
         const query = event.target.value;
         setSearchTerm(query);
-        if (query === ''){
+        if (query === '') {
             return
         }
         // Clear previous timeout to debounce input events
@@ -23,9 +25,9 @@ function SearchBar() {
                 const response = await fetch(`${API_URL}/users/search?searchTerm=${query}`, {
                     method: 'GET',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
                     },
-                    credentials: 'include'
                 });
                 if (response.ok) {
                     const searchData = await response.json();
@@ -55,7 +57,7 @@ function SearchBar() {
                 <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, width: '100%' }}>
                     <ListGroup>
                         {searchResults.map((user) => (
-                            <ListGroup.Item key={user.id}>
+                            <ListGroup.Item key={user.id} onSelect={onSelect}>
                                 {user.nickname} - {user.email}
                             </ListGroup.Item>
                         ))}

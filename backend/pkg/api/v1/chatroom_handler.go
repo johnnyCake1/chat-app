@@ -58,7 +58,7 @@ func GetChatroomById(chatroomService *service.ChatroomService) fiber.Handler {
 // @Param id path int true "User ID"
 // @Param page query int false "Page number"
 // @Param pageSize query int false "Page size"
-// @Success 200 {array} model.Chatroom
+// @Success 200 {array} model.ChatroomForUser
 // @Failure 400 {object} map[string]string
 // @Router /api/v1/users/{id}/chatrooms [get]
 func GetUserChatrooms(chatroomService *service.ChatroomService) fiber.Handler {

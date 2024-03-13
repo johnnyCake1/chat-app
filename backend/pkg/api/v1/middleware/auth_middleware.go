@@ -3,18 +3,27 @@ package middleware
 import (
 	v1 "backend/pkg/api/v1"
 	"github.com/gofiber/fiber/v2"
+	"strings"
 )
 
-// Protect is a middleware to protect routes from unauthorised access
-func Protect() func(c *fiber.Ctx) error {
+// AuthMiddleware middleware to check JWT token in Authorization header
+func AuthMiddleware() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		token := c.Cookies("jwt")
-		if err := v1.ValidateAuthToken(token); err != nil {
+		authHeader := c.Get("Authorization")
+		if authHeader == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "Unauthorised. Please login/register first",
+				"message": "Authorization header missing",
 			})
 		}
-
+		token := strings.Split(authHeader, " ")[1]
+		userId, err := v1.ValidateAuthToken(token)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Invalid token",
+			})
+		}
+		// Set user ID in context for subsequent handlers
+		c.Locals("userID", userId)
 		return c.Next()
 	}
 }

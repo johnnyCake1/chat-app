@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Container, Row, Col, Form, Button } from 'react-bootstrap';
 import { API_URL } from '../../constants';
+import useLocalStorageState from '../../util/userLocalStorage';
 
 const LoginPage = () => {
+  const [, setToken] = useLocalStorageState('token');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigate = useNavigate();
+  const [redirect, setRedirect] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleEmailChange = (e) => {
@@ -29,16 +31,16 @@ const LoginPage = () => {
       const response = await fetch(`${API_URL}/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(loginData),
-        credentials: 'include'
       });
 
       if (response.ok) {
-        const userData = await response.json();
-        console.log("User successfully logged in:", userData);
-        navigate('/')
+        const tokenData = await response.json();
+        console.log("User successfully logged in with token:", tokenData.token);
+        setToken(tokenData.token);
+        setRedirect(true);
       } else {
         const errorData = await response.json();
         setErrorMessage(errorData.message);
@@ -48,6 +50,10 @@ const LoginPage = () => {
       setErrorMessage('Login failed. Please try again later.');
     }
   };
+
+  if (redirect) {
+    return <Navigate to='/' />
+  }
 
   return (
     <Container className="mt-5">

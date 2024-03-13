@@ -17,6 +17,6 @@ func (cs *ChatroomService) GetChatroomById(chatroomId uint, page, pageSize int) 
 	return cs.chatroomRepo.FindByID(chatroomId, page, pageSize)
 }
 
-func (cs *ChatroomService) GetChatroomsByUserId(userId uint, page, pageSize int) ([]model.Chatroom, error) {
+func (cs *ChatroomService) GetChatroomsByUserId(userId uint, page, pageSize int) ([]model.ChatroomForUser, error) {
 	return cs.chatroomRepo.FindChatroomsByUserID(userId, page, pageSize)
 }

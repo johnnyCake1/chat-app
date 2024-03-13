@@ -50,11 +50,11 @@ func SetupRoutes(app *fiber.App, services *service.Services, messageHub *consume
 	api.Post("/logout", v1.LogoutHandler())
 	api.Post("/validateToken", v1.ValidateTokenHandler())
 	// User routes
-	api.Get("/users", middleware.Protect(), v1.GetUsers(services.UserService))
-	api.Get("/users/search", middleware.Protect(), v1.SearchUsers(services.UserService))
-	api.Get("/users/:id", middleware.Protect(), v1.GetUser(services.UserService))
-	api.Delete("/users/:id", middleware.Protect(), v1.GetUser(services.UserService))
-	api.Get("/users/:id/chatrooms", middleware.Protect(), v1.GetUserChatrooms(services.ChatroomService))
+	api.Get("/users", middleware.AuthMiddleware(), v1.GetUsers(services.UserService))
+	api.Get("/users/search", middleware.AuthMiddleware(), v1.SearchUsers(services.UserService))
+	api.Get("/users/:id", middleware.AuthMiddleware(), v1.GetUser(services.UserService))
+	api.Delete("/users/:id", middleware.AuthMiddleware(), v1.GetUser(services.UserService))
+	api.Get("/users/:id/chatrooms", middleware.AuthMiddleware(), v1.GetUserChatrooms(services.ChatroomService))
 	// Chatrooms routes
-	api.Get("/chatrooms/:id", middleware.Protect(), v1.GetChatroomById(services.ChatroomService))
+	api.Get("/chatrooms/:id", middleware.AuthMiddleware(), v1.GetChatroomById(services.ChatroomService))
 }

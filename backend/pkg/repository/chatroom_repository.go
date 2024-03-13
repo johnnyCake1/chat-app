@@ -23,7 +23,7 @@ func (r *ChatroomRepository) FindByID(id uint, page, pageSize int) (*model.Chatr
 
 	row := r.db.QueryRow(query, id)
 
-	var chatroomID int
+	var chatroomID uint
 	var isGroup bool
 	var groupName sql.NullString
 	var createdAt time.Time
@@ -49,7 +49,7 @@ func (r *ChatroomRepository) FindByID(id uint, page, pageSize int) (*model.Chatr
 	}
 
 	// Retrieve messages for this chatroom
-	messages, err := r.FindMessagesByChatroomID(uint(chatroomID), page, pageSize)
+	messages, err := r.FindMessagesByChatroomID(chatroomID, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (r *ChatroomRepository) FindByID(id uint, page, pageSize int) (*model.Chatr
 }
 
 // GetParticipantsForChatroom Retrieves participants for a chatroom
-func (r *ChatroomRepository) GetParticipantsForChatroom(chatroomID int) ([]model.User, error) {
+func (r *ChatroomRepository) GetParticipantsForChatroom(chatroomID uint) ([]model.User, error) {
 	// Query to select participants for a chatroom
 	query := "SELECT u.id, u.nickname, u.email, u.avatar_url, u.created_at FROM users u JOIN chatroom_participants cp ON u.id = cp.user_id WHERE cp.chatroom_id = $1"
 
@@ -102,12 +102,12 @@ func (r *ChatroomRepository) FindMessagesByChatroomID(chatroomID uint, page, pag
 
 	// Query to select messages for a chatroom with pagination
 	query := `
-        SELECT id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted
-        FROM messages
-        WHERE chatroom_id = $1
-        ORDER BY timestamp DESC
-        LIMIT $2 OFFSET $3
-    `
+			SELECT id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted
+			FROM messages
+			WHERE chatroom_id = $1
+			ORDER BY timestamp
+			LIMIT $2 OFFSET $3
+		`
 	rows, err := r.db.Query(query, chatroomID, pageSize, offset)
 	if err != nil {
 		return nil, err
@@ -141,8 +141,8 @@ func (r *ChatroomRepository) FindMessagesByChatroomID(chatroomID uint, page, pag
 	return messages, nil
 }
 
-// FindChatroomsByUserID retrieves all the chatrooms that a user belongs to.
-func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize int) ([]model.Chatroom, error) {
+// FindChatroomsByUserID retrieves all the chatrooms that a user belongs to and calculates the unread count for each chatroom.
+func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize int) ([]model.ChatroomForUser, error) {
 	query := `
         SELECT c.id, c.is_group, c.group_name, c.created_at
         FROM chatrooms c
@@ -155,10 +155,10 @@ func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize i
 	}
 	defer rows.Close()
 
-	var chatrooms []model.Chatroom
+	var chatrooms []model.ChatroomForUser
 
 	for rows.Next() {
-		var chatroom model.Chatroom
+		var chatroom model.ChatroomForUser
 		var groupNameNullable sql.NullString
 
 		if err := rows.Scan(&chatroom.ID, &chatroom.IsGroup, &groupNameNullable, &chatroom.CreatedAt); err != nil {
@@ -170,7 +170,7 @@ func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize i
 		}
 
 		// Retrieve messages for the chatroom
-		messages, err := r.FindMessagesByChatroomID(uint(chatroom.ID), page, pageSize)
+		messages, err := r.FindMessagesByChatroomID(chatroom.ID, page, pageSize)
 		if err != nil {
 			return nil, err
 		}
@@ -183,6 +183,14 @@ func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize i
 		}
 		chatroom.Participants = participants
 
+		// Calculate unread count for the chatroom
+		unreadCount, err := r.CalculateUnreadCount(chatroom.ID, userID)
+		if err != nil {
+			return nil, err
+		}
+		chatroom.UnreadCount = unreadCount
+		chatroom.UserID = userID
+
 		// Append chatroom to the slice
 		chatrooms = append(chatrooms, chatroom)
 	}
@@ -192,4 +200,18 @@ func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize i
 	}
 
 	return chatrooms, nil
+}
+
+// CalculateUnreadCount calculates the number of unread messages for a given chatroom and user.
+func (r *ChatroomRepository) CalculateUnreadCount(chatroomID uint, userID uint) (int, error) {
+	query := `
+        SELECT COUNT(*) FROM messages
+        WHERE chatroom_id = $1 AND sender_user_id != $2 AND viewed = false
+    `
+	var unreadCount int
+	err := r.db.QueryRow(query, chatroomID, userID).Scan(&unreadCount)
+	if err != nil {
+		return 0, err
+	}
+	return unreadCount, nil
 }

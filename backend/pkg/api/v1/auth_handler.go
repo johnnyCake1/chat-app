@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -56,18 +57,9 @@ func RegisterHandler(userService *service.UserService) fiber.Handler {
 			})
 		}
 
-		// Store the token into client's Cookie
-		cookie := fiber.Cookie{
-			Name:     "jwt",
-			Value:    token,
-			Expires:  time.Now().Add(72 * time.Hour),
-			HTTPOnly: true,
-		}
-		c.Cookie(&cookie)
-
-		return c.JSON(user)
+		// Only returning token in the response body
+		return c.JSON(fiber.Map{"token": token})
 	}
-
 }
 
 // LoginHandler handles user login
@@ -106,7 +98,7 @@ func LoginHandler(userService *service.UserService) fiber.Handler {
 			})
 		}
 
-		// generate a jwt token
+		// Generate a jwt token
 		token, err := GenerateAuthToken(user.ID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -114,15 +106,8 @@ func LoginHandler(userService *service.UserService) fiber.Handler {
 			})
 		}
 
-		cookie := fiber.Cookie{
-			Name:     "jwt",
-			Value:    token,
-			Expires:  time.Now().Add(72 * time.Hour),
-			HTTPOnly: true,
-		}
-		c.Cookie(&cookie)
-
-		return c.JSON(user)
+		// Only returning token in the response body
+		return c.JSON(fiber.Map{"token": token})
 	}
 }
 
@@ -134,15 +119,8 @@ func LoginHandler(userService *service.UserService) fiber.Handler {
 // @Router /api/v1/logout [post]
 func LogoutHandler() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		cookie := fiber.Cookie{
-			Name:     "jwt",
-			Value:    "",
-			Expires:  time.Now().Add(-time.Hour),
-			HTTPOnly: true,
-		}
-		c.Cookie(&cookie)
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"message": "success",
+			"message": "Successfully logged out",
 		})
 	}
 }
@@ -154,14 +132,19 @@ func LogoutHandler() fiber.Handler {
 // @Param token query string false "JWT token"
 // @Success 200
 // @Failure 401 {object} map[string]string
-// @Router /api/v1/validateToken [get]
+// @Router /api/v1/validateToken [post]
 func ValidateTokenHandler() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		token := c.Query("token")
 		if token == "" {
-			token = c.Cookies("jwt")
+			token = c.Get("Authorization")
+			if token != "" {
+				// Remove "Bearer " prefix
+				token = strings.Replace(token, "Bearer ", "", 1)
+			}
 		}
-		if err := ValidateAuthToken(token); err != nil {
+		_, err := ValidateAuthToken(token)
+		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"message": "Invalid token",
 			})
@@ -184,15 +167,22 @@ func GenerateAuthToken(userID uint) (string, error) {
 	return token, nil
 }
 
-func ValidateAuthToken(token string) error {
+func ValidateAuthToken(token string) (uint, error) {
 	if token == "" {
-		return fmt.Errorf("empty token provided")
+		return 0, fmt.Errorf("empty token provided")
 	}
-	//Token validation logic
-	_, err := jwt.ParseWithClaims(token, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+	// Token validation logic
+	claims := &jwt.RegisteredClaims{}
+	parsedToken, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(config.JwtSecret), nil
 	})
-	//userID := parsedToken.Claims.(*jwt.RegisteredClaims).Issuer // this is how to retrieve the id of the request's user
-
-	return err
+	if err != nil || !parsedToken.Valid {
+		return 0, fmt.Errorf("invalid token: %v", err)
+	}
+	userIDString := claims.Issuer
+	userID, err := strconv.ParseUint(userIDString, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid user ID in token: %v", err)
+	}
+	return uint(userID), nil
 }

@@ -1,22 +1,32 @@
 import React from 'react';
 import { ListGroup } from 'react-bootstrap';
+import './ConversationList.css'; // Import your custom CSS for styling
 
-const ConversationList = ({ onSelect }) => {
-  const conversations = [];
-
-  return <>Number of chats: {conversations.length}</>
+const ConversationList = ({ conversations, onConverstationSelect }) => {
   return (
-    <ListGroup className="conversation-list">
-      {conversations.map(conversation => (
-        <ListGroup.Item key={conversation.id} onClick={() => onSelect(conversation.id)}>
-          <div className="avatar">{conversation.avatar}</div>
-          <div className="info">
-            <div className="name">{conversation.name}</div>
-            <div className="message">{conversation.lastMessage}</div>
-          </div>
-        </ListGroup.Item>
-      ))}
-    </ListGroup>
+    <div className="conversation-list-container">
+      <ListGroup>
+        {conversations.map((conversation) => (
+          <ListGroup.Item
+            key={conversation.id}
+            action
+            onClick={() => onConverstationSelect(conversation)}
+            className={conversation.selected ? 'conversation-item selected' : 'conversation-item'}
+          >
+            <div className="conversation-info">
+              <div className="conversation-title">{conversation.conversationName}</div>
+              <div className="conversation-last-message">{conversation.lastMessage}</div>
+            </div>
+            <div className="conversation-meta">
+              <div className="conversation-time">{conversation.timeStamp}</div>
+              {conversation.unreadCount > 0 && (
+                <div className="unread-count">{conversation.unreadCount}</div>
+              )}
+            </div>
+          </ListGroup.Item>
+        ))}
+      </ListGroup>
+    </div>
   );
 };
 
