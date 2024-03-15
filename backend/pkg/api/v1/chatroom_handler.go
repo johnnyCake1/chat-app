@@ -22,7 +22,7 @@ import (
 // @Router /api/v1/chatrooms/{id} [get]
 func GetChatroomById(chatroomService *service.ChatroomService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		chatRoomId, err := strconv.ParseUint(c.Params("id"), 10, 64)
+		chatroomID, err := strconv.ParseUint(c.Params("id"), 10, 64)
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid chatroom ID"})
 		}
@@ -36,8 +36,15 @@ func GetChatroomById(chatroomService *service.ChatroomService) fiber.Handler {
 		if err != nil || pageSize <= 0 {
 			pageSize = config.MessageHistoryPaginationDefaultSize
 		}
+		userIDRaw := c.Locals("userID")
+		userID, ok := userIDRaw.(uint)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "userID not found in context",
+			})
+		}
 
-		chatroom, err := chatroomService.GetChatroomById(uint(chatRoomId), int(page), int(pageSize))
+		chatroom, err := chatroomService.GetChatroomById(uint(chatroomID), userID, int(page), int(pageSize))
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": fmt.Sprintf("Couldn't query the chatroom from database: %v", err)})
 		}
@@ -78,14 +85,14 @@ func GetUserChatrooms(chatroomService *service.ChatroomService) fiber.Handler {
 			pageSize = config.MessageHistoryPaginationDefaultSize
 		}
 
-		chatroom, err := chatroomService.GetChatroomsByUserId(uint(userId), int(page), int(pageSize))
+		chatrooms, err := chatroomService.GetChatroomsByUserId(uint(userId), int(page), int(pageSize))
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": fmt.Sprintf("Couldn't query the chatrooms for user with id %v from database: %v", userId, err)})
 		}
-		if chatroom == nil {
+		if chatrooms == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Chatroom not found"})
 		}
 
-		return c.JSON(chatroom)
+		return c.JSON(chatrooms)
 	}
 }

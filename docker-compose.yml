@@ -38,18 +38,19 @@ services:
     networks:
       - chat-network
 
-  pgadmin:
-    image: dpage/pgadmin4
-    depends_on:
-      - postgres
-    ports:
-      - "5050:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: root@root.com
-      PGADMIN_DEFAULT_PASSWORD: rootuser
-    restart: unless-stopped
-    networks:
-      - chat-network
+# Uncomment to use pgadmin to be able to connect and manage the postgres database from browser
+#  pgadmin:
+#    image: dpage/pgadmin4
+#    depends_on:
+#      - postgres
+#    ports:
+#      - "5050:80"
+#    environment:
+#      PGADMIN_DEFAULT_EMAIL: root@root.com
+#      PGADMIN_DEFAULT_PASSWORD: rootuser
+#    restart: unless-stopped
+#    networks:
+#      - chat-network
 
   rabbitmq:
     image: rabbitmq:3-management

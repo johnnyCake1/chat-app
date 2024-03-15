@@ -16,14 +16,14 @@ func AuthMiddleware() func(c *fiber.Ctx) error {
 			})
 		}
 		token := strings.Split(authHeader, " ")[1]
-		userId, err := v1.ValidateAuthToken(token)
+		userID, err := v1.ValidateAuthToken(token)
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"message": "Invalid token",
 			})
 		}
 		// Set user ID in context for subsequent handlers
-		c.Locals("userID", userId)
+		c.Locals("userID", userID)
 		return c.Next()
 	}
 }

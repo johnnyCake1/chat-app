@@ -3,14 +3,11 @@ package api
 import (
 	"backend/pkg/config"
 	"backend/pkg/consumer"
-	"backend/pkg/model"
-	"encoding/json"
+	"backend/pkg/service"
 	"github.com/gofiber/websocket/v2"
 	"github.com/streadway/amqp"
 	"log"
 )
-
-// TODO: implement user identification on each request. Also add chatrooms to the clients that they are subscribed to. For that we will also need the connected user identity to see in what chats he is a participant
 
 // ClientWebSocketConnectionHandler handles client connection to the server websocket.
 // @Summary Handle WebSocket connection
@@ -18,9 +15,25 @@ import (
 // @Tags WebSocket
 // @Success 101
 // @Router /ws [get]
-func ClientWebSocketConnectionHandler(messageHub *consumer.MessageHub) func(c *websocket.Conn) {
+func ClientWebSocketConnectionHandler(messageHub *consumer.MessageHub, chatroomService *service.ChatroomService) func(c *websocket.Conn) {
 	return func(c *websocket.Conn) {
+		userIDRaw := c.Locals("userID")
+		userID, ok := userIDRaw.(uint)
+		if !ok {
+			log.Printf("failed to connect the client: invalid user id in the context")
+			return
+		}
 		client := &consumer.Client{Conn: c, ChatIDs: make(map[uint]bool)}
+		// retrieve chatrooms that the user is subscribed to
+		chatrooms, err := chatroomService.GetChatroomsByUserId(userID, 1, 1)
+		if err != nil {
+			return
+		}
+		for _, chatroom := range chatrooms {
+			client.ChatIDs[chatroom.ID] = true
+		}
+		client.UserID = userID
+		log.Printf("Client connected (user id: %v)", userID)
 		messageHub.Register <- client
 
 		defer func() {
@@ -28,51 +41,44 @@ func ClientWebSocketConnectionHandler(messageHub *consumer.MessageHub) func(c *w
 			c.Close()
 		}()
 
-		var (
-			msg []byte
-			err error
-		)
-
 		// Handle messages from the client WebSocket and disconnect the client on failure
 		for {
-			// Listen for message from WebSocket client.
+			var (
+				msg []byte
+				err error
+			)
+			// Listen for message from WebSocket client (blocking operation)
 			if _, msg, err = c.ReadMessage(); err != nil {
-				log.Printf("Error reading message from a websocket: %v\n", err)
-				break
+				log.Printf("Error reading message from a websocket: %v. Disconnecting the client\n", err)
+				messageHub.Unregister <- client
+				return
 			}
 
-			// Handle message
-			var message model.Message
-			if err = json.Unmarshal(msg, &message); err != nil {
-				log.Printf("Error parsing message: %v\n", err)
-				break
+			// If it's a ping message then ignore it
+			if string(msg) == "PING" {
+				log.Printf("Received `PING` from client with user %v\n", client.UserID)
+				continue
 			}
 
 			// Publish message to RabbitMQ
-			if err := PublishMessageToQueue(message, messageHub.MessageQueueChannel); err != nil {
+			if err := PublishMessageToQueue(msg, messageHub.MessageQueueChannel); err != nil {
 				log.Printf("Error publishing message: %v\n", err)
-				break
+				continue
 			}
 		}
 	}
 }
 
-func PublishMessageToQueue(message model.Message, ch *amqp.Channel) error {
-	// Serialize message to JSON
-	messageBytes, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-	// debugging log:
-	log.Printf("Message published to message queue:%v\n", message.Text)
-	err = ch.Publish(
+func PublishMessageToQueue(msg []byte, ch *amqp.Channel) error {
+	log.Printf("Message published to msg queue\n")
+	err := ch.Publish(
 		"",                           // exchange
 		config.ChatMessageRoutingKey, // routing key
 		false,                        // mandatory
 		false,                        // immediate
 		amqp.Publishing{
 			ContentType: "application/json",
-			Body:        messageBytes,
+			Body:        msg,
 		},
 	)
 	return err

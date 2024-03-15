@@ -4,8 +4,8 @@ import (
 	"backend/pkg/model"
 	"database/sql"
 	"errors"
+	"fmt"
 	_ "github.com/lib/pq"
-	"time"
 )
 
 type ChatroomRepository struct {
@@ -18,17 +18,19 @@ func NewChatroomRepository(db *sql.DB) *ChatroomRepository {
 }
 
 // FindByID finds a chatroom by its ID. Returns nil if chatroom is not found.
-func (r *ChatroomRepository) FindByID(id uint, page, pageSize int) (*model.Chatroom, error) {
+func (r *ChatroomRepository) FindByID(chatroomID, userID uint, page, pageSize int) (*model.ChatroomForUser, error) {
 	query := "SELECT id, is_group, group_name, created_at FROM chatrooms WHERE id = $1"
 
-	row := r.db.QueryRow(query, id)
+	row := r.db.QueryRow(query, chatroomID)
 
-	var chatroomID uint
-	var isGroup bool
+	chatroom := &model.ChatroomForUser{
+		Chatroom: model.Chatroom{},
+		UserID:   userID,
+	}
+
 	var groupName sql.NullString
-	var createdAt time.Time
 
-	err := row.Scan(&chatroomID, &isGroup, &groupName, &createdAt)
+	err := row.Scan(&chatroom.ID, &chatroom.IsGroup, &groupName, &chatroom.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// Return nil if no chatroom found
@@ -41,12 +43,7 @@ func (r *ChatroomRepository) FindByID(id uint, page, pageSize int) (*model.Chatr
 	if groupName.Valid {
 		groupNameString = groupName.String
 	}
-	chatroom := &model.Chatroom{
-		ID:        chatroomID,
-		IsGroup:   isGroup,
-		GroupName: groupNameString,
-		CreatedAt: createdAt,
-	}
+	chatroom.GroupName = groupNameString
 
 	// Retrieve messages for this chatroom
 	messages, err := r.FindMessagesByChatroomID(chatroomID, page, pageSize)
@@ -61,6 +58,12 @@ func (r *ChatroomRepository) FindByID(id uint, page, pageSize int) (*model.Chatr
 		return nil, err
 	}
 	chatroom.Participants = participants
+	// Calculate unread count for the chatroom
+	unreadCount, err := r.CalculateUnreadCount(chatroomID, userID)
+	if err != nil {
+		return nil, err
+	}
+	chatroom.UnreadCount = unreadCount
 
 	return chatroom, nil
 }
@@ -100,14 +103,18 @@ func (r *ChatroomRepository) FindMessagesByChatroomID(chatroomID uint, page, pag
 	// Calculate offset based on page number and page size
 	offset := (page - 1) * pageSize
 
-	// Query to select messages for a chatroom with pagination
+	// Query to select messages for a chatroom with pagination. We first sort messages in desc order and cut the desired part out and sort that part back to ascending order.
 	query := `
-			SELECT id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted
+		SELECT id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted, edited
+		FROM (
+			SELECT id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted, edited
 			FROM messages
 			WHERE chatroom_id = $1
-			ORDER BY timestamp
+			ORDER BY timestamp DESC
 			LIMIT $2 OFFSET $3
-		`
+		) AS sub
+		ORDER BY timestamp
+	`
 	rows, err := r.db.Query(query, chatroomID, pageSize, offset)
 	if err != nil {
 		return nil, err
@@ -122,7 +129,7 @@ func (r *ChatroomRepository) FindMessagesByChatroomID(chatroomID uint, page, pag
 		var message model.Message
 		var attachmentURLNullable sql.NullString
 
-		err := rows.Scan(&message.ID, &message.ChatRoomID, &message.SenderID, &message.Text, &attachmentURLNullable, &message.TimeStamp, &message.Viewed, &message.Deleted)
+		err := rows.Scan(&message.ID, &message.ChatRoomID, &message.SenderID, &message.Text, &attachmentURLNullable, &message.TimeStamp, &message.Viewed, &message.Deleted, &message.Edited)
 		if err != nil {
 			return nil, err
 		}
@@ -214,4 +221,47 @@ func (r *ChatroomRepository) CalculateUnreadCount(chatroomID uint, userID uint) 
 		return 0, err
 	}
 	return unreadCount, nil
+}
+
+func (r *ChatroomRepository) AddMessageToChatroom(chatroomID uint, message model.Message) (model.Message, error) {
+	// Prepare SQL query to insert a new message
+	query := `
+        INSERT INTO messages (chatroom_id, sender_user_id, text, attachment_url)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted, edited
+    `
+	var newMessage model.Message
+	var attachmentURL sql.NullString
+	err := r.db.QueryRow(query, chatroomID, message.SenderID, message.Text, message.AttachmentURL).Scan(
+		&newMessage.ID, &newMessage.ChatRoomID, &newMessage.SenderID, &newMessage.Text, &attachmentURL, &newMessage.TimeStamp, &newMessage.Viewed, &newMessage.Deleted, &newMessage.Edited)
+	if err != nil {
+		return model.Message{}, err
+	}
+	if attachmentURL.Valid {
+		newMessage.AttachmentURL = attachmentURL.String
+	}
+
+	return newMessage, nil
+}
+
+func (r *ChatroomRepository) MarkMessageAsViewed(messageID uint) (model.Message, error) {
+	// Prepare SQL query to update a message and return the updated row
+	query := `
+        UPDATE messages 
+        SET viewed = true 
+        WHERE id = $1
+        RETURNING id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted, edited
+    `
+	var message model.Message
+	var attachmentURL sql.NullString
+	err := r.db.QueryRow(query, messageID).Scan(
+		&message.ID, &message.ChatRoomID, &message.SenderID, &message.Text, &attachmentURL, &message.TimeStamp, &message.Viewed, &message.Deleted, &message.Edited)
+	if err != nil {
+		return model.Message{}, fmt.Errorf("failed to mark the message as viewed: %v", err)
+	}
+	if attachmentURL.Valid {
+		message.AttachmentURL = attachmentURL.String
+	}
+
+	return message, nil
 }

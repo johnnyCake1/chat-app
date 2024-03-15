@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS messages (
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     viewed BOOLEAN DEFAULT FALSE,
     deleted BOOLEAN DEFAULT FALSE,
+    edited BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (chatroom_id) REFERENCES chatrooms(id),
     FOREIGN KEY (sender_user_id) REFERENCES users(id)
 );

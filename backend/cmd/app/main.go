@@ -25,19 +25,20 @@ func main() {
 	defer db.Close()
 
 	// RabbitMQ connection and message queue declaration for message sending
-	conn, ch, err := connectToRabbitMQ()
+	messageQueueConn, messageQueueChannel, err := connectToRabbitMQ()
 	if err != nil {
 		log.Fatal(fmt.Sprintf("couldn't connect to RabbitMQ: %v", err))
 	}
-	defer conn.Close()
-	// Start the message consumer service
-	MessageHub := consumer.NewMessageHub(ch)
-	go MessageHub.StartMessageConsumerService()
+	defer messageQueueConn.Close()
 
 	// Initialise all repositories
 	repos := repository.InitRepositories(db)
 	// Initialise all services
 	services := service.InitServices(repos)
+
+	// Start the message consumer service
+	MessageHub := consumer.NewMessageHub(messageQueueChannel)
+	go MessageHub.StartMessageConsumerService(services.ChatroomService)
 
 	app := fiber.New()
 
