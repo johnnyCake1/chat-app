@@ -3,6 +3,7 @@ import { Form, FormControl, ListGroup } from 'react-bootstrap';
 import { API_URL } from '../constants';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorageState from '../util/userLocalStorage';
+import './SearchBar.css';
 
 function SearchBar({ onSelect }) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -55,9 +56,12 @@ function SearchBar({ onSelect }) {
             </Form>
             {searchTerm && searchResults && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, width: '100%' }}>
-                    <ListGroup>
+                    <ListGroup className="search-results">
                         {searchResults.map((user) => (
-                            <ListGroup.Item key={user.id} onSelect={onSelect}>
+                            <ListGroup.Item key={user.id} onClick={() => {
+                                onSelect(user);
+                                setSearchTerm('');
+                            }}>
                                 {user.nickname} - {user.email}
                             </ListGroup.Item>
                         ))}

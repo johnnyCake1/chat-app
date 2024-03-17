@@ -388,7 +388,7 @@ const docTemplate = `{
                 "messages": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/model.Message"
+                        "$ref": "#/definitions/model.ChatMessage"
                     }
                 },
                 "participants": {
@@ -410,7 +410,7 @@ const docTemplate = `{
                 }
             }
         },
-        "model.Message": {
+        "model.ChatMessage": {
             "type": "object",
             "properties": {
                 "attachmentURL": {

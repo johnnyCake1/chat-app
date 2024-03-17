@@ -11,7 +11,7 @@ const ProtectedRoute = ({ children }) => {
 
   useEffect(() => {
     try {
-      fetch(`${API_URL}/validateToken?token=${token}`, {
+      fetch(`${API_URL}/validateToken`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       }).then(response => {

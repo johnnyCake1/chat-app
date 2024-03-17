@@ -28,18 +28,34 @@ const ChatWindow = ({ conversation, ws, currentUser }) => {
     setMessageInput(e.target.value);
   };
 
-  
-
-
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (ws && messageInput.trim()) {
-      const messageData = {
-        messageOption: MessageOptions.MESSAGE_SEND,
-        chatroomID: conversation.id,
-        senderID: currentUser.id,
-        text: messageInput,
+      setMessageInput('');
+      let messageData = {
+        messageOption: '',
+      };
+
+      if (conversation.id) {
+        // If conversation exists, send message to the conversation
+        messageData.messageOption = 'SEND_MESSAGE';
+        messageData.sendMessage = {
+          senderID: currentUser.id,
+          chatroomID: conversation.id,
+          text: messageInput,
+        };
+      } else {
+        // If conversation doesn't exist, create a new private chatroom
+        messageData.messageOption = 'CREATE_PRIVATE_CHATROOM';
+        messageData.createPrivateChatroom = {
+          participants: conversation.participants,
+          chatMessage: {
+            text: messageInput,
+            senderID: currentUser.id,
+          }
+        };
       }
+
       console.log("Sending message data:", messageData)
       ws.send(JSON.stringify(messageData));
       setMessageInput('');
@@ -76,9 +92,9 @@ const ChatWindow = ({ conversation, ws, currentUser }) => {
       </Row>
       <Row className="message-list" ref={messageListRef}>
         <Col>
-          {conversation.messages.map((message, idx) => (
+          {conversation.messages.length > 0 && conversation.messages.map((message, idx) => (
             <div
-              key={message.id}
+              key={idx}
               className={`message ${message.senderID === currentUser.id ? 'sent' : 'received'}`}
               ref={idx === conversation.messages.length - 1 ? lastMessageRef : null}
             >
@@ -87,7 +103,7 @@ const ChatWindow = ({ conversation, ws, currentUser }) => {
                 {new Date(message.timeStamp).toLocaleTimeString()}
               </div>
             </div>
-          ))}
+          )) || <div className="empty-chat">No messages yet. Say hello to {conversation.conversationName}</div>}
         </Col>
       </Row>
       <Row className="input-box">

@@ -6,9 +6,9 @@ const ConversationList = ({ conversations, onConverstationSelect }) => {
   return (
     <div className="conversation-list-container">
       <ListGroup>
-        {conversations.map((conversation) => (
+        {conversations.map((conversation, idx) => (
           <ListGroup.Item
-            key={conversation.id}
+            key={idx}
             action
             onClick={() => onConverstationSelect(conversation)}
             className={conversation.selected ? 'conversation-item selected' : 'conversation-item'}

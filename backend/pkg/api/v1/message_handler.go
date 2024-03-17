@@ -11,7 +11,7 @@ import (
 // SendMessage Sends a message to message queue
 func SendMessage(messageChannel *amqp.Channel) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		body := new(model.Message)
+		body := new(model.ChatMessage)
 		err := c.BodyParser(body)
 		if err != nil {
 			_ = c.Status(fiber.StatusBadRequest).SendString(err.Error())
@@ -26,7 +26,7 @@ func SendMessage(messageChannel *amqp.Channel) fiber.Handler {
 	}
 }
 
-func SendToQueue(message model.Message, ch *amqp.Channel) error {
+func SendToQueue(message model.ChatMessage, ch *amqp.Channel) error {
 	// Serialize message to JSON
 	messageBytes, err := json.Marshal(message)
 	if err != nil {

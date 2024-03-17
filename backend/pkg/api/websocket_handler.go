@@ -24,6 +24,7 @@ func ClientWebSocketConnectionHandler(messageHub *consumer.MessageHub, chatroomS
 			return
 		}
 		client := &consumer.Client{Conn: c, ChatIDs: make(map[uint]bool)}
+		// TODO: send chatrooms to the client on connection through the websocket
 		// retrieve chatrooms that the user is subscribed to
 		chatrooms, err := chatroomService.GetChatroomsByUserId(userID, 1, 1)
 		if err != nil {
@@ -70,7 +71,7 @@ func ClientWebSocketConnectionHandler(messageHub *consumer.MessageHub, chatroomS
 }
 
 func PublishMessageToQueue(msg []byte, ch *amqp.Channel) error {
-	log.Printf("Message published to msg queue\n")
+	log.Printf("ChatMessage published to msg queue\n")
 	err := ch.Publish(
 		"",                           // exchange
 		config.ChatMessageRoutingKey, // routing key

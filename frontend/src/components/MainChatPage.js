@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
 import ConversationList from './ConversationList';
 import ChatWindow from './ChatWindow';
 import SearchBar from './SearchBar';
-import { API_URL } from '../constants';
+import { API_URL, CHAT_SUB_PROTOCOL } from '../constants';
 import useLocalStorageState from '../util/userLocalStorage';
 
 const MainChatPage = () => {
@@ -12,7 +12,6 @@ const MainChatPage = () => {
   const [token,] = useLocalStorageState('token');
   const [currentUser, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const chatProtocol = 'chat-protocol';
 
   useEffect(() => {
     if (token) {
@@ -38,16 +37,100 @@ const MainChatPage = () => {
     }
   }, [token]);
 
-  // Maximum number of connection retry attempts
-  const MAX_RETRY_ATTEMPTS = 3;
-  let retryCount = 0;
+  const handleReceivedMessage = (messageData) => {
+    setConversations(prevConversations => {
+      // Check if the conversation exists
+      const conversationExists = prevConversations.some(conversation => conversation.id === messageData.sendMessage.chatroomID);
+      console.log("Conversation exists:", conversationExists);
+      if (!conversationExists) {
+        // If the conversation doesn't exist, create a new one
+        const newConversation = {
+          id: messageData.sendMessage.chatroomID,
+          messages: [messageData.sendMessage],
+          lastMessage: messageData.sendMessage.text,
+          timeStamp: new Date(messageData.sendMessage.timeStamp).toLocaleTimeString(),
+          selected: false,
+          unreadCount: currentUser.id !== messageData.sendMessage.senderID ? 1 : 0,
+        };
+
+        // Add the new conversation to the conversations array
+        return [...prevConversations, newConversation];
+      } else {
+        // If the conversation exists, update it
+        const updatedConversations = prevConversations.map(conversation => {
+          if (conversation.id === messageData.sendMessage.chatroomID) {
+            return {
+              ...conversation,
+              lastMessage: messageData.sendMessage.text,
+              timeStamp: new Date(messageData.sendMessage.timeStamp).toLocaleTimeString(),
+              messages: [...conversation.messages, messageData.sendMessage],
+              unreadCount: currentUser.id !== messageData.sendMessage.senderID ? conversation.unreadCount + 1 : conversation.unreadCount,
+            };
+          }
+          return conversation;
+        });
+
+        // Update selected conversation if it matches the received message's chatroomID
+        const selectedConversationIndex = updatedConversations.findIndex(conversation => conversation.id === messageData.sendMessage.chatroomID);
+        if (selectedConversationIndex !== -1) {
+          setSelectedConversation(updatedConversations[selectedConversationIndex]);
+        }
+
+        return updatedConversations;
+      }
+    });
+  };
+
+  const handleCreatePrivateChatroom = (messageData) => {
+    setConversations(prevConversations => {
+      // Check if the conversation exists
+      const conversationExists = prevConversations.some(conversation => conversation.id === messageData.createPrivateChatroom.chatroomID);
+      console.log("Conversation exists:", conversationExists);
+      if (!conversationExists) {
+        // If the conversation doesn't exist, create a new one
+        const newConversation = {
+          id: messageData.createPrivateChatroom.chatroomID,
+          messages: [messageData.createPrivateChatroom.chatMessage],
+          lastMessage: messageData.createPrivateChatroom.chatMessage.text,
+          profilePictureURL: messageData.createPrivateChatroom.chatroomPictureURL,
+          conversationName: messageData.createPrivateChatroom.chatroomName,
+          timeStamp: messageData.createPrivateChatroom.chatMessage.timeStamp,
+          unreadCount: messageData.createPrivateChatroom.unreadCount
+        };
+
+        // Add the new conversation to the conversations array
+        return [...prevConversations, newConversation];
+      } else {
+        // If the conversation exists, update it
+        const updatedConversations = prevConversations.map(conversation => {
+          if (conversation.id === messageData.createPrivateChatroom.chatroomID) {
+            return {
+              ...conversation,
+              lastMessage: messageData.createPrivateChatroom.chatMessage.text,
+              timeStamp: messageData.createPrivateChatroom.chatMessage.timeStamp,
+              messages: [...conversation.messages, messageData.createPrivateChatroom.chatMessage],
+              conversationName: messageData.createPrivateChatroom.chatroomName,
+              unreadCount: messageData.createPrivateChatroom.unreadCount,
+            };
+          }
+          return conversation;
+        });
+
+        // Update selected conversation if it matches the received message's chatroomID
+        const selectedConversationIndex = updatedConversations.findIndex(conversation => conversation.id === messageData.createPrivateChatroom.chatroomID);
+        if (selectedConversationIndex !== -1) {
+          setSelectedConversation(updatedConversations[selectedConversationIndex]);
+        }
+
+        return updatedConversations;
+      }
+    });
+  };
+
   // Function to create a new WebSocket instance with all necessary handlers
   const createWebSocket = () => {
-    if (retryCount >= MAX_RETRY_ATTEMPTS) {
-      console.log("Too many reconnect tries!");
-      return null;
-    }
-    const websocket = new WebSocket('ws://localhost/ws', [`${chatProtocol}`, `${token}`]);
+    console.log("Creating a new WebSocket instance...");
+    const websocket = new WebSocket('ws://localhost/ws', [`${CHAT_SUB_PROTOCOL}`, `${token}`]);
 
     websocket.onopen = () => {
       console.log('WebSocket Connected');
@@ -71,33 +154,23 @@ const MainChatPage = () => {
     };
 
     websocket.onmessage = (e) => {
-      const message = JSON.parse(e.data);
-      console.log("Message received:", message, "\nCurrent conversations:", conversations);
-
-      setConversations(prevConversations => {
-        const updatedConversations = prevConversations.map(conversation => {
-          if (conversation.id === message.chatRoomID) {
-            return {
-              ...conversation,
-              lastMessage: message.text,
-              timeStamp: new Date(message.timeStamp).toLocaleTimeString(),
-              messages: [...conversation.messages, message],
-              unreadCount: currentUser.id !== message.senderID ? conversation.unreadCount + 1 : conversation.unreadCount,
-            };
-          }
-          return conversation;
-        });
-
-        // Update selected conversation if it matches the received message's chatRoomID
-        const selectedConversationIndex = updatedConversations.findIndex(conversation => conversation.id === message.chatRoomID);
-        if (selectedConversationIndex !== -1) {
-          setSelectedConversation(updatedConversations[selectedConversationIndex]);
+      const messageData = JSON.parse(e.data);
+      console.log(`Message data received with option ${messageData.messageOption}:`, messageData);
+      // decide what to do with the received message data
+      switch (messageData.messageOption) {
+        case 'SEND_MESSAGE': {
+          handleReceivedMessage(messageData);
+          break;
         }
-
-        return updatedConversations;
-      });
+        case 'CREATE_PRIVATE_CHATROOM': {
+          handleCreatePrivateChatroom(messageData);
+          break;
+        }
+        default: {
+          console.log("Unknown message option:", messageData.messageOption);
+        }
+      }
     };
-    retryCount++;
     return websocket;
   };
 
@@ -122,38 +195,39 @@ const MainChatPage = () => {
     setSelectedConversation(conversation);
   };
 
-  const mapClientConversations = (rawConversations) => {
-    console.log("raw", rawConversations);
-    return rawConversations.map(({ id, isGroup, groupName, participants, messages, unreadCount }) => {
-      let conversationName = '';
-      if (isGroup) {
-        conversationName = groupName;
-      } else {
-        const otherParticipant = participants.find(participant => participant.id !== currentUser.id);
-        if (otherParticipant) {
-          conversationName = otherParticipant.nickname || otherParticipant.email;
-        }
+  // resolve additional conversation details
+  const resolveConversationAdditionalDetails = ({ id, isGroup, groupName, participants, messages, unreadCount }) => {
+    let conversationName = '';
+    if (isGroup) {
+      conversationName = groupName;
+    } else {
+      const otherParticipant = participants.find(participant => participant.id !== currentUser.id);
+      if (otherParticipant) {
+        conversationName = otherParticipant.nickname || otherParticipant.email;
       }
+    }
 
-      let lastMessage = ''
-      let timeStamp = ''
-      if (messages && messages.length > 0) {
-        lastMessage = messages[messages.length - 1].text;
-        timeStamp = new Date(messages[messages.length - 1].timeStamp).toLocaleTimeString();
-      }
-      return {
-        id,
-        isGroup,
-        participants,
-        messages,
-        lastMessage,
-        timeStamp,
-        conversationName,
-        selected: false,
-        unreadCount,
-      };
-    });
-  };
+    let lastMessage = ''
+    let timeStamp = ''
+    if (messages && messages.length > 0) {
+      lastMessage = messages[messages.length - 1].text;
+      timeStamp = new Date(messages[messages.length - 1].timeStamp).toLocaleTimeString();
+    }
+
+    return {
+      id,
+      isGroup,
+      groupName,
+      participants,
+      messages,
+      unreadCount,
+      // Additional details after resolving:
+      lastMessage,
+      timeStamp,
+      conversationName,
+      selected: false,
+    };
+  }
 
 
   useEffect(() => {
@@ -172,8 +246,8 @@ const MainChatPage = () => {
         }
 
         const data = await response.json();
-        const mappedConversations = mapClientConversations(data);
-        setConversations(mappedConversations);
+        console.log("Fetched chatrooms:", data);
+        setConversations(data.map(resolveConversationAdditionalDetails));
       } catch (error) {
         console.error("Failed to fetch chatrooms:", error);
       }
@@ -189,11 +263,38 @@ const MainChatPage = () => {
 
   console.log("Conversations:", conversations);
 
+  const handleUserSelect = (selectedUser) => {
+    console.log("Selected user:", selectedUser);
+    console.log("current conversations:", conversations)
+    // Find the 1 to 1 conversation with the selected user
+    const existingConversation = conversations.find(conversation =>
+      !conversation.isGroup &&
+      conversation.participants.some(participant => participant.id === selectedUser.id)
+    );
+
+    if (existingConversation) {
+      // If a conversation with the selected user exists, select it
+      console.log("Existing conversation found:", existingConversation);
+      setSelectedConversation(existingConversation);
+    } else {
+      // If no conversation exists, create a new one
+      const newConversation = resolveConversationAdditionalDetails({
+        participants: [currentUser, selectedUser],
+        messages: [],
+      })
+      console.log("Creating new conversation:", newConversation);
+
+      // Add the new conversation to the conversations array, but don't persist it to the server yet
+      setConversations(prevConversations => [...prevConversations, newConversation]);
+      // Select the new conversation
+      setSelectedConversation(newConversation);
+    }
+  };
   return (
     <Container fluid>
       <Row>
         <Col md={4}>
-          <SearchBar onSelect={handleConversationSelect} />
+          <SearchBar onSelect={handleUserSelect} />
           <ConversationList conversations={conversations} onConverstationSelect={handleConversationSelect} />
         </Col>
         <Col md={8}>
