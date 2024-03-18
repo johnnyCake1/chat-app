@@ -578,15 +578,24 @@ func (r *ChatroomRepository) UpdateGroupChatroomTx(tx *sql.Tx, options *model.Up
 		RETURNING id, is_group, created_at
 	`
 	var chatroom model.Chatroom
-	err := tx.QueryRow(query, options.GroupName, options.ChatroomID).Scan(&chatroom.ID, &chatroom.IsGroup, &chatroom.CreatedAt)
+	err := tx.QueryRow(query, options.GroupName, options.ID).Scan(&chatroom.ID, &chatroom.IsGroup, &chatroom.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 
 	// Add participants to the chatroom
-	if err := r.AddParticipantsToChatroom(tx, chatroom.ID, options.Participants); err != nil {
+	usersIDs := getUsersIDs(options.Participants)
+	if err := r.AddParticipantsToChatroom(tx, chatroom.ID, usersIDs); err != nil {
 		return nil, err
 	}
 
 	return &chatroom, nil
+}
+
+func getUsersIDs(users []model.User) []uint {
+	ids := make([]uint, len(users))
+	for i, user := range users {
+		ids[i] = user.ID
+	}
+	return ids
 }

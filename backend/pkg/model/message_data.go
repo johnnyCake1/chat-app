@@ -72,14 +72,11 @@ type CreatePrivateChatroom struct {
 }
 
 type CreateGroupChatroom struct {
-	GroupName    string `json:"groupName,omitempty"`
-	Participants []uint `json:"participants,omitempty"`
+	Chatroom
 }
 
 type UpdateGroupChatroom struct {
-	ChatroomID   uint   `json:"chatroomID,omitempty"`
-	GroupName    string `json:"groupName,omitempty"`
-	Participants []uint `json:"participants,omitempty"` // TODO: Implement adding and removing participants in separate actions
+	Chatroom
 }
 
 type DeleteGroupChatroom struct {

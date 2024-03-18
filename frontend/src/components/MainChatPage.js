@@ -84,43 +84,53 @@ const MainChatPage = () => {
   const handleCreatePrivateChatroom = (messageData) => {
     setConversations(prevConversations => {
       // Check if the conversation exists
-      const conversationExists = prevConversations.some(conversation => conversation.id === messageData.createPrivateChatroom.chatroomID);
+      const conversationExists = prevConversations.some(conversation => conversation.id === messageData.createPrivateChatroom.id);
       console.log("Conversation exists:", conversationExists);
+
+      const updateSelectedConversation = (conversation) => {
+        // Update the selected conversation if this conversation is currently selected 
+        setSelectedConversation(prevSelectedConversation => {
+          console.log("update?");
+          if (prevSelectedConversation && currentUser.id === messageData.createPrivateChatroom.chatMessage.senderID) {
+            console.log("update!");
+            return conversation;
+          }
+          console.log("no update!");
+          return prevSelectedConversation;
+        });
+      }
       if (!conversationExists) {
         // If the conversation doesn't exist, create a new one
         const newConversation = {
-          id: messageData.createPrivateChatroom.chatroomID,
+          id: messageData.createPrivateChatroom.id,
           messages: [messageData.createPrivateChatroom.chatMessage],
           lastMessage: messageData.createPrivateChatroom.chatMessage.text,
           profilePictureURL: messageData.createPrivateChatroom.chatroomPictureURL,
           conversationName: messageData.createPrivateChatroom.chatroomName,
-          timeStamp: messageData.createPrivateChatroom.chatMessage.timeStamp,
+          timeStamp: new Date(messageData.createPrivateChatroom.chatMessage.timeStamp).toLocaleTimeString(),
           unreadCount: messageData.createPrivateChatroom.unreadCount
         };
-
+        updateSelectedConversation(newConversation);
         // Add the new conversation to the conversations array
-        return [...prevConversations, newConversation];
+        return [newConversation, ...prevConversations];
       } else {
         // If the conversation exists, update it
         const updatedConversations = prevConversations.map(conversation => {
-          if (conversation.id === messageData.createPrivateChatroom.chatroomID) {
-            return {
+          if (conversation.id === messageData.createPrivateChatroom.id) {
+            const updatedConversation = {
               ...conversation,
               lastMessage: messageData.createPrivateChatroom.chatMessage.text,
-              timeStamp: messageData.createPrivateChatroom.chatMessage.timeStamp,
+              timeStamp: new Date(messageData.createPrivateChatroom.chatMessage.timeStamp).toLocaleTimeString(),
               messages: [...conversation.messages, messageData.createPrivateChatroom.chatMessage],
               conversationName: messageData.createPrivateChatroom.chatroomName,
               unreadCount: messageData.createPrivateChatroom.unreadCount,
-            };
+            }
+            updateSelectedConversation(updatedConversation);
+            return updatedConversation;
           }
+
           return conversation;
         });
-
-        // Update selected conversation if it matches the received message's chatroomID
-        const selectedConversationIndex = updatedConversations.findIndex(conversation => conversation.id === messageData.createPrivateChatroom.chatroomID);
-        if (selectedConversationIndex !== -1) {
-          setSelectedConversation(updatedConversations[selectedConversationIndex]);
-        }
 
         return updatedConversations;
       }
@@ -278,16 +288,13 @@ const MainChatPage = () => {
       setSelectedConversation(existingConversation);
     } else {
       // If no conversation exists, create a new one
-      const newConversation = resolveConversationAdditionalDetails({
+      const emptyConversation = resolveConversationAdditionalDetails({
         participants: [currentUser, selectedUser],
         messages: [],
       })
-      console.log("Creating new conversation:", newConversation);
-
-      // Add the new conversation to the conversations array, but don't persist it to the server yet
-      setConversations(prevConversations => [...prevConversations, newConversation]);
+      console.log("Creating new conversation:", emptyConversation);
       // Select the new conversation
-      setSelectedConversation(newConversation);
+      setSelectedConversation(emptyConversation);
     }
   };
   return (

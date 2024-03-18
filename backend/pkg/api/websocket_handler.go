@@ -34,7 +34,6 @@ func ClientWebSocketConnectionHandler(messageHub *consumer.MessageHub, chatroomS
 			client.ChatIDs[chatroom.ID] = true
 		}
 		client.UserID = userID
-		log.Printf("Client connected (user id: %v)", userID)
 		messageHub.Register <- client
 
 		defer func() {
