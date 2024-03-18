@@ -78,4 +78,5 @@ func SetupRoutes(app *fiber.App, services *service.Services, messageHub *consume
 	api.Get("/users/:id/chatrooms", middleware.AuthMiddleware(), v1.GetUserChatrooms(services.ChatroomService))
 	// Chatrooms routes
 	api.Get("/chatrooms/:id", middleware.AuthMiddleware(), v1.GetChatroomById(services.ChatroomService))
+	api.Get("/chatrooms/:id/messages", middleware.AuthMiddleware(), v1.GetChatroomMessages(services.ChatroomService))
 }

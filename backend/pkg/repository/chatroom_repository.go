@@ -592,6 +592,10 @@ func (r *ChatroomRepository) UpdateGroupChatroomTx(tx *sql.Tx, options *model.Up
 	return &chatroom, nil
 }
 
+func (r *ChatroomRepository) GetChatroomMessages(chatroomID uint, page, pageSize int) ([]model.ChatMessage, error) {
+	return r.FindMessagesByChatroomID(chatroomID, page, pageSize)
+}
+
 func getUsersIDs(users []model.User) []uint {
 	ids := make([]uint, len(users))
 	for i, user := range users {

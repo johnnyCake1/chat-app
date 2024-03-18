@@ -3,7 +3,7 @@ import { Container, Row, Col } from 'react-bootstrap';
 import ConversationList from './ConversationList';
 import ChatWindow from './ChatWindow';
 import SearchBar from './SearchBar';
-import { API_URL, CHAT_SUB_PROTOCOL } from '../constants';
+import { API_URL, CHAT_SUB_PROTOCOL, MessageOptions } from '../constants';
 import useLocalStorageState from '../util/userLocalStorage';
 
 const MainChatPage = () => {
@@ -90,12 +90,9 @@ const MainChatPage = () => {
       const updateSelectedConversation = (conversation) => {
         // Update the selected conversation if this conversation is currently selected 
         setSelectedConversation(prevSelectedConversation => {
-          console.log("update?");
           if (prevSelectedConversation && currentUser.id === messageData.createPrivateChatroom.chatMessage.senderID) {
-            console.log("update!");
             return conversation;
           }
-          console.log("no update!");
           return prevSelectedConversation;
         });
       }
@@ -113,30 +110,50 @@ const MainChatPage = () => {
         updateSelectedConversation(newConversation);
         // Add the new conversation to the conversations array
         return [newConversation, ...prevConversations];
-      } else {
-        // If the conversation exists, update it
-        const updatedConversations = prevConversations.map(conversation => {
-          if (conversation.id === messageData.createPrivateChatroom.id) {
-            const updatedConversation = {
-              ...conversation,
-              lastMessage: messageData.createPrivateChatroom.chatMessage.text,
-              timeStamp: new Date(messageData.createPrivateChatroom.chatMessage.timeStamp).toLocaleTimeString(),
-              messages: [...conversation.messages, messageData.createPrivateChatroom.chatMessage],
-              conversationName: messageData.createPrivateChatroom.chatroomName,
-              unreadCount: messageData.createPrivateChatroom.unreadCount,
-            }
-            updateSelectedConversation(updatedConversation);
-            return updatedConversation;
-          }
-
-          return conversation;
-        });
-
-        return updatedConversations;
       }
+      // If the conversation exists, update it
+      const updatedConversations = prevConversations.map(conversation => {
+        if (conversation.id === messageData.createPrivateChatroom.id) {
+          const updatedConversation = {
+            ...conversation,
+            lastMessage: messageData.createPrivateChatroom.chatMessage.text,
+            timeStamp: new Date(messageData.createPrivateChatroom.chatMessage.timeStamp).toLocaleTimeString(),
+            messages: [...conversation.messages, messageData.createPrivateChatroom.chatMessage],
+            conversationName: messageData.createPrivateChatroom.chatroomName,
+            unreadCount: messageData.createPrivateChatroom.unreadCount,
+          }
+          updateSelectedConversation(updatedConversation);
+          return updatedConversation;
+        }
+
+        return conversation;
+      });
+
+      return updatedConversations;
     });
   };
 
+  // Function to update the conversation list with the new conversation and return the updated list
+  const setConversation = (newConversation) => {
+    let found = false;
+    const updatedConversations = conversations.map((conversation) => {
+      if (conversation.id === newConversation.id) {
+        found = true;
+        return newConversation;
+      }
+      return conversation;
+    });
+    // If the conversation is not found, add it to the beginning of the list
+    if (!found) {
+      updatedConversations.unshift(newConversation);
+    }
+    setConversations(updatedConversations);
+  };
+
+  // Retry timeout for WebSocket connection which increases after each retry
+  const initialRetryTimeout = 1000; // start with 1 second
+  const maxRetryTimeout = 60000; // max 60 seconds
+  let retryTimeout = initialRetryTimeout;
   // Function to create a new WebSocket instance with all necessary handlers
   const createWebSocket = () => {
     console.log("Creating a new WebSocket instance...");
@@ -144,7 +161,8 @@ const MainChatPage = () => {
 
     websocket.onopen = () => {
       console.log('WebSocket Connected');
-      // Sending pings every 55 seconds so that websocket connection does not die
+      retryTimeout = initialRetryTimeout; // reset reconnect timeout on successful connection
+      // Sending heartbeat check pings every 55 seconds so that websocket connection does not die
       const t = setInterval(function () {
         if (websocket.readyState !== 1) {
           clearInterval(t);
@@ -159,8 +177,19 @@ const MainChatPage = () => {
 
     websocket.onerror = (error) => {
       console.log('WebSocket Error: ', error, "\n Trying to recover the connection...");
-      // Reconnect if the connection is lost (note: it's not really a recursive call as react will re-render this component after calling the setWs so that there's no actual recursive function stack)
-      setWs(createWebSocket());
+    };
+
+    websocket.onclose = (event) => {
+      console.log(`WebSocket closed with code ${event.code} and reason: ${event.reason}`);
+      console.log("Trying to recover the connection...");
+      setTimeout(() => {
+        setWs(createWebSocket());
+        // Increase the timeout after each retry
+        retryTimeout *= 2;
+        if (retryTimeout > maxRetryTimeout) {
+          retryTimeout = maxRetryTimeout;
+        }
+      }, retryTimeout);
     };
 
     websocket.onmessage = (e) => {
@@ -168,11 +197,11 @@ const MainChatPage = () => {
       console.log(`Message data received with option ${messageData.messageOption}:`, messageData);
       // decide what to do with the received message data
       switch (messageData.messageOption) {
-        case 'SEND_MESSAGE': {
+        case MessageOptions.SEND_MESSAGE: {
           handleReceivedMessage(messageData);
           break;
         }
-        case 'CREATE_PRIVATE_CHATROOM': {
+        case MessageOptions.CREATE_PRIVATE_CHATROOM: {
           handleCreatePrivateChatroom(messageData);
           break;
         }
@@ -205,7 +234,7 @@ const MainChatPage = () => {
     setSelectedConversation(conversation);
   };
 
-  // resolve additional conversation details
+  // resolve additional conversation details // TODO: remove this client side logic and make the api return the additional details
   const resolveConversationAdditionalDetails = ({ id, isGroup, groupName, participants, messages, unreadCount }) => {
     let conversationName = '';
     if (isGroup) {
@@ -305,7 +334,7 @@ const MainChatPage = () => {
           <ConversationList conversations={conversations} onConverstationSelect={handleConversationSelect} />
         </Col>
         <Col md={8}>
-          <ChatWindow conversation={selectedConversation} ws={ws} currentUser={currentUser} />
+          <ChatWindow conversation={selectedConversation} setConversation={setConversation} ws={ws} currentUser={currentUser} />
         </Col>
       </Row>
     </Container>

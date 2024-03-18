@@ -64,3 +64,7 @@ func (cs *ChatroomService) CreateGroupChatroom(options *model.ChatroomOptions) (
 func (cs *ChatroomService) UpdateGroupChatroom(options *model.UpdateGroupChatroom) (*model.Chatroom, error) {
 	return cs.chatroomRepo.UpdateGroupChatroom(options)
 }
+
+func (cs *ChatroomService) GetChatroomMessages(chatroomID uint, page, pageSize int) ([]model.ChatMessage, error) {
+	return cs.chatroomRepo.GetChatroomMessages(chatroomID, page, pageSize)
+}

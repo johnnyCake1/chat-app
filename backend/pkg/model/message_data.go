@@ -98,6 +98,7 @@ const (
 	MessageDataOptionReactToMessage = "REACT_TO_MESSAGE"
 	// MessageDataOptionCreatePrivateChatroom is used to create a private chatroom
 	MessageDataOptionCreatePrivateChatroom = "CREATE_PRIVATE_CHATROOM"
+	MessageDataOptionUpdatePrivateChatroom = "UPDATE_PRIVATE_CHATROOM"
 	// MessageDataOptionCreateGroupChatroom is used to create a group chatroom
 	MessageDataOptionCreateGroupChatroom = "CREATE_GROUP_CHATROOM"
 	// MessageDataOptionUpdateGroupChatroom is used to update a group chatroom

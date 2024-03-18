@@ -5,6 +5,7 @@ import (
 	"backend/pkg/service"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"log"
 	"strconv"
 )
 
@@ -27,14 +28,13 @@ func GetChatroomById(chatroomService *service.ChatroomService) fiber.Handler {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid chatroom ID"})
 		}
 		// Parse pagination parameters and for no valid parameters case replace with default values
-		var page, pageSize int64
-		page, err = strconv.ParseInt(c.Params("page"), 10, 64)
-		if err != nil || page <= 0 {
-			page = 1
+		page, err := parseInt(c.Query("page"), 1)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": fmt.Sprintf("Invalid page query parameter: %v", c.Query("page"))})
 		}
-		pageSize, err = strconv.ParseInt(c.Params("pageSize"), 10, 64)
-		if err != nil || pageSize <= 0 {
-			pageSize = config.MessageHistoryPaginationDefaultSize
+		pageSize, err := parseInt(c.Query("pageSize"), config.MessageHistoryPaginationDefaultSize)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": fmt.Sprintf("Invalid pageSize query parameter: %v", c.Query("pageSize"))})
 		}
 		userIDRaw := c.Locals("userID")
 		userID, ok := userIDRaw.(uint)
@@ -75,16 +75,14 @@ func GetUserChatrooms(chatroomService *service.ChatroomService) fiber.Handler {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid user ID"})
 		}
 		// Parse pagination parameters and for no valid parameters case replace with default values
-		var page, pageSize int64
-		page, err = strconv.ParseInt(c.Params("page"), 10, 64)
-		if err != nil || page <= 0 {
-			page = 1
+		page, err := parseInt(c.Query("page"), 1)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": fmt.Sprintf("Invalid page query parameter: %v", c.Query("page"))})
 		}
-		pageSize, err = strconv.ParseInt(c.Params("pageSize"), 10, 64)
-		if err != nil || pageSize <= 0 {
-			pageSize = config.MessageHistoryPaginationDefaultSize
+		pageSize, err := parseInt(c.Query("pageSize"), config.MessageHistoryPaginationDefaultSize)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": fmt.Sprintf("Invalid pageSize query parameter: %v", c.Query("pageSize"))})
 		}
-
 		chatrooms, err := chatroomService.GetChatroomsByUserId(uint(userId), int(page), int(pageSize))
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": fmt.Sprintf("Couldn't query the chatrooms for user with id %v from database: %v", userId, err)})
@@ -94,5 +92,44 @@ func GetUserChatrooms(chatroomService *service.ChatroomService) fiber.Handler {
 		}
 
 		return c.JSON(chatrooms)
+	}
+}
+
+func parseInt(paramStr string, defaultValue int64) (int64, error) {
+	if paramStr == "" {
+		return defaultValue, nil
+	}
+	paramValue, err := strconv.ParseInt(paramStr, 10, 64)
+	if err != nil || paramValue <= 0 {
+		return 0, fmt.Errorf("invalid param string: %v Failed with error: %v", paramStr, err)
+	}
+	return paramValue, nil
+}
+
+func GetChatroomMessages(chatroomService *service.ChatroomService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		chatroomID, err := strconv.ParseUint(c.Params("id"), 10, 64)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid chatroom ID"})
+		}
+		// Parse pagination parameters and for no valid parameters case replace with default values
+		page, err := parseInt(c.Query("page"), 1)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": fmt.Sprintf("Invalid page query parameter: %v", c.Query("page"))})
+		}
+		pageSize, err := parseInt(c.Query("pageSize"), config.MessageHistoryPaginationDefaultSize)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": fmt.Sprintf("Invalid pageSize query parameter: %v", c.Query("pageSize"))})
+		}
+		messages, err := chatroomService.GetChatroomMessages(uint(chatroomID), int(page), int(pageSize))
+		log.Printf("Page number: %v, pageSize: %v, Messages: %v", page, pageSize, messages)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": fmt.Sprintf("Couldn't query the messages from database: %v", err)})
+		}
+		if messages == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Messages not found"})
+		}
+
+		return c.JSON(messages)
 	}
 }

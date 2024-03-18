@@ -2,19 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Container, Row, Col, Form, Button } from 'react-bootstrap';
 import './ChatWindow.css';
 import { Navigate } from 'react-router-dom';
+import { API_URL, MessageOptions } from '../constants';
+import useLocalStorageState from '../util/userLocalStorage';
 
-const ChatWindow = ({ conversation, ws, currentUser }) => {
+const ChatWindow = ({ conversation, setConversation /* supposed to be used to update the passed conversation */, ws, currentUser }) => {
   const [messageInput, setMessageInput] = useState('');
-  const messageListRef = useRef(null);
+  const [page, setPage] = useState(1);
+  const [token,] = useLocalStorageState('token');
 
-  // enums for message options
-  const MessageOptions = {
-    MESSAGE_SEND: "MESSAGE_SEND",
-    MESSAGE_EDIT: "MESSAGE_EDIT",
-    MESSAGE_VIEW: "MESSAGE_VIEW",
-    MESSAGE_DELETE: "MESSAGE_DELETE",
-    MESSAGE_REACTION: "MESSAGE_REACTION",
-  };
+  const messageListRef = useRef(null);
 
   // scroll down whenever user sends/receives message
   const lastMessageRef = useRef(null);
@@ -28,6 +24,37 @@ const ChatWindow = ({ conversation, ws, currentUser }) => {
     setMessageInput(e.target.value);
   };
 
+  const loadMessages = async (page) => {
+    fetch(`${API_URL}/chatrooms/${conversation.id}/messages?page=${page}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      }
+    }).then(response => {
+      if (response.ok) {
+        return response.json();
+      }
+      console.log("Failed to load messages:", response.status, response.statusText);
+      return [];
+    }).then(responseData => {
+      console.log("Loaded messages:", responseData);
+      // use setConversation to update the conversation with the new messages instead of this:
+      conversation.messages = [...responseData, ...conversation.messages];
+      setConversation(conversation);
+      setPage(prevPage => prevPage + 1);
+    }).catch(err => {
+      console.error("Error loading messages:", err);
+    });
+  };
+
+  const handleScroll = (e) => {
+    const { scrollTop } = e.currentTarget;
+    if (scrollTop === 0) {
+      loadMessages(page);
+    }
+  };
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (ws && messageInput.trim()) {
@@ -38,7 +65,7 @@ const ChatWindow = ({ conversation, ws, currentUser }) => {
 
       if (conversation.id) {
         // If conversation exists, send message to the conversation
-        messageData.messageOption = 'SEND_MESSAGE';
+        messageData.messageOption = MessageOptions.SEND_MESSAGE;
         messageData.sendMessage = {
           senderID: currentUser.id,
           chatroomID: conversation.id,
@@ -46,7 +73,7 @@ const ChatWindow = ({ conversation, ws, currentUser }) => {
         };
       } else {
         // If conversation doesn't exist, create a new private chatroom
-        messageData.messageOption = 'CREATE_PRIVATE_CHATROOM';
+        messageData.messageOption = MessageOptions.CREATE_PRIVATE_CHATROOM;
         messageData.createPrivateChatroom = {
           participants: conversation.participants,
           chatMessage: {
@@ -79,7 +106,7 @@ const ChatWindow = ({ conversation, ws, currentUser }) => {
   }
 
   return (
-    <Container className="chat-window">
+    <Container className="chat-window" onScroll={handleScroll}>
       <Row className="header-bar">
         <Col>
           <div className="conversation-name">{conversation.conversationName}</div>
