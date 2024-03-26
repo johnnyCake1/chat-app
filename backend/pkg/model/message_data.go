@@ -1,19 +1,7 @@
 package model
 
-// ChatroomOptions DEPRECATED: Use chatroom action structs instead. It is used to specify chatroom options when creating a new chatroom
-type ChatroomOptions struct {
-	ID           uint   `json:"id,omitempty"`
-	IsGroup      bool   `json:"isGroup,omitempty"`
-	GroupName    string `json:"groupName,omitempty"`
-	Participants []uint `json:"participants,omitempty"`
-	//Admins       []uint `json:"admins"` // TODO: For now everyone is admin. Implement admin feature: admins can delete messages, add participants, change group name, etc.
-}
-
 // MessageData used to pass message data between client and server through websocket
 type MessageData struct {
-	ChatMessage     *ChatMessage     `json:"chatMessage,omitempty"`
-	ChatroomOptions *ChatroomOptions `json:"chatroomOptions,omitempty"` //TODO: DEPRECATED: Used to specify chatroom options when creating a new chatroom
-
 	// new implementation
 	MessageOption string `json:"messageOption,omitempty"`
 	// chatroom actions:
@@ -38,6 +26,8 @@ type MessageData struct {
 	ReactToMessage *ReactToMessage `json:"reactToMessage,omitempty"`
 }
 
+// TODO: currently we are using MessageData for both listening for actions and broadcasting. Instead use MessageData only for actions (requests from client to server) and implement a separate struct for broadcasting notifications (response from server to clients)
+
 type SendMessage struct {
 	ChatMessage
 }
@@ -46,6 +36,8 @@ type ViewMessage struct {
 	ViewerID   uint `json:"viewerID,omitempty"`
 	MessageID  uint `json:"messageID,omitempty"`
 	ChatroomID uint `json:"chatroomID,omitempty"`
+	// append on response:
+	ChatMessage `json:"chatMessage,omitempty"`
 }
 
 type EditMessage struct {

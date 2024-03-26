@@ -25,7 +25,7 @@ const ProtectedRoute = ({ children }) => {
     } catch (error) {
       console.error('Error validating user token:', error);
     }
-  }, []);
+  }, [token]);
 
   if (isLoading) {
     return (

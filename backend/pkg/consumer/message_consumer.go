@@ -144,14 +144,17 @@ func (h *ViewMessageHandler) HandleMessage(messageData *model.MessageData, chatr
 	if messageData.ViewMessage.MessageID == 0 {
 		return nil, fmt.Errorf("error marking message as viewed: messageID is not specified")
 	}
+	if messageData.ViewMessage.ViewerID == 0 {
+		return nil, fmt.Errorf("error marking message as viewed: viewerID is not specified")
+	}
 	if messageData.ViewMessage.ChatroomID == 0 {
 		return nil, fmt.Errorf("error marking message as viewed: chatroomID is not specified")
 	}
-	updatedMessage, err := chatroomService.MarkMessageAsViewed(messageData.ViewMessage.MessageID)
+	updatedMessage, err := chatroomService.MarkMessageAsViewed(messageData.ViewMessage)
 	if err != nil {
 		return nil, fmt.Errorf("error marking message as viewed: %v", err)
 	}
-	messageData.ChatMessage = updatedMessage
+	messageData.ViewMessage.ChatMessage = *updatedMessage
 	for client := range clients {
 		// If the client is a participant of the chatroom
 		if client.ChatIDs[messageData.ViewMessage.ChatroomID] {
@@ -170,11 +173,7 @@ func (h *CreateGroupChatroomHandler) HandleMessage(messageData *model.MessageDat
 		return nil, fmt.Errorf("error creating group chatroom: participants should be specified")
 	}
 	participantsIDs := getUsersIDs(messageData.CreateGroupChatroom.Participants)
-	chatroom, err := chatroomService.CreateGroupChatroom(&model.ChatroomOptions{
-		IsGroup:      true,
-		GroupName:    messageData.CreateGroupChatroom.GroupName,
-		Participants: participantsIDs,
-	})
+	chatroom, err := chatroomService.CreateGroupChatroom(messageData.CreateGroupChatroom)
 	if err != nil {
 		return nil, fmt.Errorf("error creating group chatroom: %v", err)
 	}

@@ -10,7 +10,7 @@ type ChatMessage struct {
 	Text          string    `json:"text,omitempty"`
 	AttachmentURL string    `json:"attachmentURL,omitempty"`
 	TimeStamp     time.Time `json:"timeStamp,omitempty"`
-	Viewed        bool      `json:"viewed,omitempty"`
-	Edited        bool      `json:"edited,omitempty"`
-	Deleted       bool      `json:"deleted,omitempty"`
+	Viewed        bool      `json:"viewed"`
+	Edited        bool      `json:"edited"`
+	Deleted       bool      `json:"deleted"`
 }

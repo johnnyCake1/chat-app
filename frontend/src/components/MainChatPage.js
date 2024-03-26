@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
 import ConversationList from './ConversationList';
 import ChatWindow from './ChatWindow';
@@ -37,6 +37,16 @@ const MainChatPage = () => {
     }
   }, [token]);
 
+  // Update the selected conversation when the conversations list changes
+  useEffect(() => {
+    if (selectedConversation) {
+      const updatedSelectedConversation = conversations.find(conversation => conversation.id === selectedConversation.id);
+      if (updatedSelectedConversation) {
+        setSelectedConversation(updatedSelectedConversation);
+      }
+    }
+  }, [conversations, selectedConversation]);
+
   const handleReceivedMessage = (messageData) => {
     setConversations(prevConversations => {
       // Check if the conversation exists
@@ -54,7 +64,7 @@ const MainChatPage = () => {
         };
 
         // Add the new conversation to the conversations array
-        return [...prevConversations, newConversation];
+        return [newConversation, ...prevConversations];
       } else {
         // If the conversation exists, update it
         const updatedConversations = prevConversations.map(conversation => {
@@ -69,13 +79,6 @@ const MainChatPage = () => {
           }
           return conversation;
         });
-
-        // Update selected conversation if it matches the received message's chatroomID
-        const selectedConversationIndex = updatedConversations.findIndex(conversation => conversation.id === messageData.sendMessage.chatroomID);
-        if (selectedConversationIndex !== -1) {
-          setSelectedConversation(updatedConversations[selectedConversationIndex]);
-        }
-
         return updatedConversations;
       }
     });
@@ -86,16 +89,6 @@ const MainChatPage = () => {
       // Check if the conversation exists
       const conversationExists = prevConversations.some(conversation => conversation.id === messageData.createPrivateChatroom.id);
       console.log("Conversation exists:", conversationExists);
-
-      const updateSelectedConversation = (conversation) => {
-        // Update the selected conversation if this conversation is currently selected 
-        setSelectedConversation(prevSelectedConversation => {
-          if (prevSelectedConversation && currentUser.id === messageData.createPrivateChatroom.chatMessage.senderID) {
-            return conversation;
-          }
-          return prevSelectedConversation;
-        });
-      }
       if (!conversationExists) {
         // If the conversation doesn't exist, create a new one
         const newConversation = {
@@ -107,25 +100,21 @@ const MainChatPage = () => {
           timeStamp: new Date(messageData.createPrivateChatroom.chatMessage.timeStamp).toLocaleTimeString(),
           unreadCount: messageData.createPrivateChatroom.unreadCount
         };
-        updateSelectedConversation(newConversation);
         // Add the new conversation to the conversations array
         return [newConversation, ...prevConversations];
       }
       // If the conversation exists, update it
       const updatedConversations = prevConversations.map(conversation => {
         if (conversation.id === messageData.createPrivateChatroom.id) {
-          const updatedConversation = {
+          return {
             ...conversation,
             lastMessage: messageData.createPrivateChatroom.chatMessage.text,
             timeStamp: new Date(messageData.createPrivateChatroom.chatMessage.timeStamp).toLocaleTimeString(),
             messages: [...conversation.messages, messageData.createPrivateChatroom.chatMessage],
             conversationName: messageData.createPrivateChatroom.chatroomName,
             unreadCount: messageData.createPrivateChatroom.unreadCount,
-          }
-          updateSelectedConversation(updatedConversation);
-          return updatedConversation;
+          };
         }
-
         return conversation;
       });
 
@@ -133,21 +122,48 @@ const MainChatPage = () => {
     });
   };
 
+  const handleMarkMessageAsViewed = (messageData) => {
+    console.log("Marking message as viewed:", messageData);
+    setConversations(prevConversations => {
+      const updatedConversations = prevConversations.map(conversation => {
+        if (conversation.id === messageData.viewMessage.chatroomID) {
+          const updatedConversation = {
+            ...conversation,
+            messages: conversation.messages.map(message => {
+              if (message.id === messageData.viewMessage.messageID) {
+                return messageData.viewMessage.chatMessage;
+              }
+              return message;
+            }),
+            unreadCount: Math.max(0, conversation.unreadCount - 1),
+          };
+          console.log("Updating conversation:", updatedConversation, "\nSelected conversation:", selectedConversation);
+          return updatedConversation;
+        }
+        return conversation;
+      });
+      console.log("updating conversations:", updatedConversations);
+
+      return updatedConversations;
+    });
+  };
   // Function to update the conversation list with the new conversation and return the updated list
   const setConversation = (newConversation) => {
-    let found = false;
-    const updatedConversations = conversations.map((conversation) => {
-      if (conversation.id === newConversation.id) {
-        found = true;
-        return newConversation;
+    setConversations((prevConversations) => {
+      let found = false;
+      const updatedConversations = prevConversations.map((conversation) => {
+        if (conversation.id === newConversation.id) {
+          found = true;
+          return newConversation;
+        }
+        return conversation;
+      });
+      // If the conversation is not found, add it to the beginning of the list
+      if (!found) {
+        return [newConversation, ...updatedConversations];
       }
-      return conversation;
+      return updatedConversations;
     });
-    // If the conversation is not found, add it to the beginning of the list
-    if (!found) {
-      updatedConversations.unshift(newConversation);
-    }
-    setConversations(updatedConversations);
   };
 
   // Retry timeout for WebSocket connection which increases after each retry
@@ -203,6 +219,10 @@ const MainChatPage = () => {
         }
         case MessageOptions.CREATE_PRIVATE_CHATROOM: {
           handleCreatePrivateChatroom(messageData);
+          break;
+        }
+        case MessageOptions.VIEW_MESSAGE: {
+          handleMarkMessageAsViewed(messageData);
           break;
         }
         default: {

@@ -6,7 +6,7 @@ import (
 
 type Chatroom struct {
 	ID           uint          `json:"id,omitempty"`
-	IsGroup      bool          `json:"isGroup,omitempty"`
+	IsGroup      bool          `json:"isGroup"`
 	GroupName    string        `json:"groupName,omitempty"`
 	CreatedAt    time.Time     `json:"createdAt,omitempty"`
 	Messages     []ChatMessage `json:"messages,omitempty"`
@@ -19,5 +19,5 @@ type ChatroomForUser struct {
 	UserID             uint   `json:"userID,omitempty"`
 	ChatroomName       string `json:"chatroomName,omitempty"`
 	ChatroomPictureURL string `json:"chatroomPictureURL,omitempty"`
-	UnreadCount        int    `json:"unreadCount,omitempty"`
+	UnreadCount        int    `json:"unreadCount"`
 }

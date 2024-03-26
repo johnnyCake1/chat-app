@@ -176,12 +176,11 @@ func (r *ChatroomRepository) FindMessagesByChatroomID(chatroomID uint, page, pag
 // FindChatroomsByUserID retrieves all the chatrooms that a user belongs to and calculates the unread count for each chatroom.
 func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize int) ([]model.ChatroomForUser, error) {
 	query := `
-        SELECT c.id, c.is_group, c.group_name, c.created_at,
-               (SELECT COUNT(*) FROM messages WHERE chatroom_id = c.id AND sender_user_id != $1 AND viewed = false) AS unread_count
-        FROM chatrooms c
-        INNER JOIN chatroom_participants cp ON c.id = cp.chatroom_id
-        WHERE cp.user_id = $1
-    `
+		SELECT c.id, c.is_group, c.group_name, c.created_at, cp.unread_count
+		FROM chatrooms c
+		INNER JOIN chatroom_participants cp ON c.id = cp.chatroom_id
+		WHERE cp.user_id = $1
+	`
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find chatrooms by user id: %v", err)
@@ -228,20 +227,6 @@ func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize i
 	return chatrooms, nil
 }
 
-// CalculateUnreadCount calculates the number of unread messages for a given chatroom and user.
-func (r *ChatroomRepository) CalculateUnreadCount(chatroomID uint, userID uint) (int, error) {
-	query := `
-        SELECT COUNT(*) FROM messages
-        WHERE chatroom_id = $1 AND sender_user_id != $2 AND viewed = false
-    `
-	var unreadCount int
-	err := r.db.QueryRow(query, chatroomID, userID).Scan(&unreadCount)
-	if err != nil {
-		return 0, err
-	}
-	return unreadCount, nil
-}
-
 func (r *ChatroomRepository) AddMessageToChatroom(chatroomID uint, message model.ChatMessage) (*model.ChatMessage, error) {
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -249,6 +234,24 @@ func (r *ChatroomRepository) AddMessageToChatroom(chatroomID uint, message model
 	}
 
 	newMessage, err := r.AddMessageToChatroomTx(tx, chatroomID, message)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return nil, fmt.Errorf("rollback failed: %v, original error: %v", rollbackErr, err)
+		}
+		return nil, err
+	}
+
+	// Insert a record into the message_views table for each user in the chatroom, except for the user who created the message
+	_, err = tx.Exec("INSERT INTO message_views (message_id, user_id) SELECT $1, user_id FROM chatroom_participants WHERE chatroom_id = $2 AND user_id != $3", newMessage.ID, chatroomID, message.SenderID)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return nil, fmt.Errorf("rollback failed: %v, original error: %v", rollbackErr, err)
+		}
+		return nil, err
+	}
+
+	// When a new message is added update the unread count for all participants in the chatroom except the sender
+	_, err = tx.Exec("UPDATE chatroom_participants SET unread_count = unread_count + 1 WHERE chatroom_id = $1 AND user_id != $2", chatroomID, message.SenderID)
 	if err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			return nil, fmt.Errorf("rollback failed: %v, original error: %v", rollbackErr, err)
@@ -293,49 +296,49 @@ func (r *ChatroomRepository) AddMessageToChatroomTx(tx *sql.Tx, chatroomID uint,
 	return newMessage, nil
 }
 
-func (r *ChatroomRepository) MarkMessageAsViewedTx(tx *sql.Tx, messageID uint) (model.ChatMessage, error) {
-	query := `
-		UPDATE messages
-		SET viewed = true
-		WHERE id = $1
-		RETURNING id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted, edited
-	`
-	var message model.ChatMessage
-	var attachmentURL sql.NullString
-	err := tx.QueryRow(query, messageID).Scan(
-		&message.ID, &message.ChatroomID, &message.SenderID, &message.Text, &attachmentURL, &message.TimeStamp, &message.Viewed, &message.Deleted, &message.Edited)
-	if err != nil {
-		return model.ChatMessage{}, fmt.Errorf("failed to mark the message as viewed: %v", err)
-	}
-	if attachmentURL.Valid {
-		message.AttachmentURL = attachmentURL.String
-	}
-
-	return message, nil
-}
-
-func (r *ChatroomRepository) MarkMessageAsViewed(messageID uint) (*model.ChatMessage, error) {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return nil, err
-	}
-
-	message, err := r.MarkMessageAsViewedTx(tx, messageID)
-	if err != nil {
-		err := tx.Rollback()
-		if err != nil {
-			return nil, fmt.Errorf("rollback failed: %v, original error: %v", err, err)
-		}
-		return nil, fmt.Errorf("failed to mark the message as viewed: %v", err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return nil, err
-	}
-
-	return &message, nil
-}
+//func (r *ChatroomRepository) MarkMessageAsViewedTx(tx *sql.Tx, messageID uint) (model.ChatMessage, error) {
+//	query := `
+//		UPDATE messages
+//		SET viewed = true
+//		WHERE id = $1
+//		RETURNING id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted, edited
+//	`
+//	var message model.ChatMessage
+//	var attachmentURL sql.NullString
+//	err := tx.QueryRow(query, messageID).Scan(
+//		&message.ID, &message.ChatroomID, &message.SenderID, &message.Text, &attachmentURL, &message.TimeStamp, &message.Viewed, &message.Deleted, &message.Edited)
+//	if err != nil {
+//		return model.ChatMessage{}, fmt.Errorf("failed to mark the message as viewed: %v", err)
+//	}
+//	if attachmentURL.Valid {
+//		message.AttachmentURL = attachmentURL.String
+//	}
+//
+//	return message, nil
+//}
+//
+//func (r *ChatroomRepository) MarkMessageAsViewed(messageID uint) (*model.ChatMessage, error) {
+//	tx, err := r.db.Begin()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	message, err := r.MarkMessageAsViewedTx(tx, messageID)
+//	if err != nil {
+//		err := tx.Rollback()
+//		if err != nil {
+//			return nil, fmt.Errorf("rollback failed: %v, original error: %v", err, err)
+//		}
+//		return nil, fmt.Errorf("failed to mark the message as viewed: %v", err)
+//	}
+//
+//	err = tx.Commit()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return &message, nil
+//}
 
 // CreatePrivateChatroom Create private chatroom between two users returning the newly created chatroom
 func (r *ChatroomRepository) CreatePrivateChatroom(user1ID, user2ID uint) (*model.Chatroom, error) {
@@ -602,4 +605,70 @@ func getUsersIDs(users []model.User) []uint {
 		ids[i] = user.ID
 	}
 	return ids
+}
+
+func (r *ChatroomRepository) MarkMessageAsViewed(chatroomID, messageID, userID uint) (*model.ChatMessage, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("marking message as viewed: %v viewer: %v", messageID, userID)
+
+	message, err := r.MarkMessageAsViewedTx(tx, chatroomID, messageID, userID)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return nil, fmt.Errorf("rollback failed: %v, original error: %v", rollbackErr, err)
+		}
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return message, nil
+}
+
+func (r *ChatroomRepository) MarkMessageAsViewedTx(tx *sql.Tx, chatroomID, messageID, viewerID uint) (*model.ChatMessage, error) {
+	// Insert a record into the message_views table
+	insertQuery := "INSERT INTO message_views (message_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+	_, err := tx.Exec(insertQuery, messageID, viewerID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update the unread count for the viewer
+	_, err = tx.Exec("UPDATE chatroom_participants SET unread_count = GREATEST(0, unread_count - 1) WHERE chatroom_id = $1 AND user_id = $2", chatroomID, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	// Update the viewed field in the messages table and return the updated message
+	updateQuery := `
+		UPDATE messages 
+		SET viewed = true 
+		WHERE id = $1 
+		RETURNING id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted, edited
+	`
+	row := tx.QueryRow(updateQuery, messageID)
+
+	var message model.ChatMessage
+	var attachmentURL sql.NullString
+	err = row.Scan(&message.ID, &message.ChatroomID, &message.SenderID, &message.Text, &attachmentURL, &message.TimeStamp, &message.Viewed, &message.Deleted, &message.Edited)
+	if err != nil {
+		return nil, err
+	}
+
+	if attachmentURL.Valid {
+		message.AttachmentURL = attachmentURL.String
+	}
+
+	return &message, nil
+}
+
+func (r *ChatroomRepository) GetUnreadCount(chatroomID, userID uint) (int, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM messages WHERE chatroom_id = $1 AND id NOT IN (SELECT message_id FROM message_views WHERE user_id = $2)", chatroomID, userID).Scan(&count)
+	return count, err
 }
