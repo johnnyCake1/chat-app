@@ -4,9 +4,10 @@ import (
 	"backend/pkg/config"
 	"backend/pkg/service"
 	"fmt"
-	"github.com/gofiber/fiber/v2"
 	"log"
 	"strconv"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // GetChatroomById gets a chatroom with participants and messages with pagination support
@@ -86,9 +87,6 @@ func GetUserChatrooms(chatroomService *service.ChatroomService) fiber.Handler {
 		chatrooms, err := chatroomService.GetChatroomsByUserId(uint(userId), int(page), int(pageSize))
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": fmt.Sprintf("Couldn't query the chatrooms for user with id %v from database: %v", userId, err)})
-		}
-		if chatrooms == nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Chatroom not found"})
 		}
 
 		return c.JSON(chatrooms)

@@ -1,8 +1,9 @@
-const HOST = 'localhost';
+const BACKEND_HOST = 'localhost';
 
-export const API_URL = `http://${HOST}:8080/api/v1`;
+export const API_URL = `http://${BACKEND_HOST}:8080/api/v1`; //docker frontend uses NGNIX to proxy requests to `/` to backend
+export const WEB_SOCKET_URL = `ws://${BACKEND_HOST}:8080/ws`; //docker frontend uses NGNIX to proxy requests to `/` to backend
 
-export const CHAT_SUB_PROTOCOL = 'chat-protocol';
+export const CHAT_SUBPROTOCOL = 'chat-protocol';
 
 // enums for message options
 export const MessageOptions = {

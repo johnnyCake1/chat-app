@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -34,13 +36,14 @@ func (r *UserRepository) FindByID(id uint) (*model.User, error) {
 	return &user, nil
 }
 
-// FindUserBySearchTerm finds users whose nickname or email contains the search term (case-insensitive), orders them by relevance, and limits the number of search results.
-func (r *UserRepository) FindUserBySearchTerm(searchTerm string) ([]model.User, error) {
+// FindUserBySearchTerm finds users whose nickname or email contains the search term (case-insensitive), orders them by relevance, and limits the number of search results, excluding specified users.
+func (r *UserRepository) FindUserBySearchTerm(searchTerm string, excludedUsers []uint) ([]model.User, error) {
 	var users []model.User
 	query := `
-        SELECT id, nickname, email, password_hash, avatar_url, created_at
+		SELECT id, nickname, email, password_hash, avatar_url, created_at
 		FROM users 
-		WHERE nickname ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%'
+		WHERE (nickname ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%')
+		AND id NOT IN (SELECT unnest($2::int[]))
 		ORDER BY CASE 
 			WHEN email ILIKE $1 THEN 1  -- Matches email exactly
 			WHEN email ILIKE '%' || $1 || '%' THEN 2  -- Matches email partially
@@ -48,8 +51,14 @@ func (r *UserRepository) FindUserBySearchTerm(searchTerm string) ([]model.User, 
 			ELSE 4  -- No match
 		END
 		LIMIT 10;
-    `
-	rows, err := r.db.Query(query, searchTerm)
+	`
+	// Convert excludedUsers from []uint to []int64 for compatibility with PostgreSQL array
+	excludedUsersInt := make([]int64, len(excludedUsers))
+	for i, id := range excludedUsers {
+		excludedUsersInt[i] = int64(id)
+	}
+
+	rows, err := r.db.Query(query, searchTerm, pq.Array(excludedUsersInt))
 	if err != nil {
 		return []model.User{}, err
 	}

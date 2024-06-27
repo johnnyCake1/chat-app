@@ -6,9 +6,10 @@ import (
 	"backend/pkg/service"
 	"encoding/json"
 	"fmt"
+	"log"
+
 	"github.com/gofiber/websocket/v2"
 	"github.com/streadway/amqp"
-	"log"
 )
 
 // Client is for storing clients connections and keeping track of chats that the client is subscribed to
@@ -92,6 +93,7 @@ func (h *MessageHub) StartMessageConsumerService(chatroomService *service.Chatro
 			}
 		case d := <-msgs:
 			messageData := &model.MessageData{}
+			log.Printf("Received raw message: %s", string(d.Body))
 			if err := json.Unmarshal(d.Body, messageData); err != nil {
 				log.Printf("Error unmarshalling message data: %v\n", err)
 				continue
@@ -131,7 +133,7 @@ func (h *SendMessageHandler) HandleMessage(messageData *model.MessageData, chatr
 	for client := range clients {
 		// If the client is a participant of the chatroom, send the messageData
 		if client.ChatIDs[messageData.SendMessage.ChatroomID] {
-			sendMessageToClient(client, messageData, model.MessageDataOptionSendMessage)
+			sendMessageDataToClient(client, messageData, model.MessageDataOptionSendMessage)
 		}
 	}
 	return messageData, nil
@@ -159,7 +161,7 @@ func (h *ViewMessageHandler) HandleMessage(messageData *model.MessageData, chatr
 		// If the client is a participant of the chatroom
 		if client.ChatIDs[messageData.ViewMessage.ChatroomID] {
 			// send the messageData to the client
-			sendMessageToClient(client, messageData, model.MessageDataOptionViewMessage)
+			sendMessageDataToClient(client, messageData, model.MessageDataOptionViewMessage)
 		}
 	}
 	return messageData, nil
@@ -184,7 +186,7 @@ func (h *CreateGroupChatroomHandler) HandleMessage(messageData *model.MessageDat
 			// update clients' chatroom subscriptions
 			client.ChatIDs[chatroom.ID] = true
 			// send the messageData to the client
-			sendMessageToClient(client, messageData, model.MessageDataOptionCreateGroupChatroom)
+			sendMessageDataToClient(client, messageData, model.MessageDataOptionCreateGroupChatroom)
 		}
 	}
 	return messageData, nil
@@ -222,7 +224,7 @@ func (h *CreatePrivateChatroomHandler) HandleMessage(messageData *model.MessageD
 			otherParticipant := getOtherParticipant(client.UserID, participant1, participant2)
 			messageData.CreatePrivateChatroom.ChatroomName = extractUserName(otherParticipant)
 			messageData.CreatePrivateChatroom.ChatroomPictureURL = otherParticipant.AvatarURL
-			sendMessageToClient(client, messageData, model.MessageDataOptionCreatePrivateChatroom)
+			sendMessageDataToClient(client, messageData, model.MessageDataOptionCreatePrivateChatroom)
 		}
 	}
 	messageData.CreatePrivateChatroom.ChatroomName = ""
@@ -303,7 +305,7 @@ func getOtherParticipant(userID uint, participant1 model.User, participant2 mode
 	return participant1
 }
 
-func sendMessageToClient(client *Client, messageData *model.MessageData, option model.MesssageOption) {
+func sendMessageDataToClient(client *Client, messageData *model.MessageData, option model.MesssageOption) {
 	err := client.Conn.WriteJSON(messageData)
 	if err != nil {
 		log.Printf("Error sending messageData to client %v with option %v: %v\n", client.UserID, option, err)

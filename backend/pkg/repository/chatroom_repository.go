@@ -4,8 +4,9 @@ import (
 	"backend/pkg/model"
 	"database/sql"
 	"fmt"
-	_ "github.com/lib/pq"
 	"log"
+
+	_ "github.com/lib/pq"
 )
 
 type ChatroomRepository struct {
@@ -187,7 +188,7 @@ func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize i
 	}
 	defer rows.Close()
 
-	var chatrooms []model.ChatroomForUser
+	var chatrooms = []model.ChatroomForUser{}
 
 	for rows.Next() {
 		var chatroom model.ChatroomForUser
@@ -221,7 +222,7 @@ func (r *ChatroomRepository) FindChatroomsByUserID(userID uint, page, pageSize i
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to find chatrooms by user id: %v", err)
+		return []model.ChatroomForUser{}, fmt.Errorf("failed to find chatrooms by user id: %v", err)
 	}
 
 	return chatrooms, nil
@@ -241,24 +242,6 @@ func (r *ChatroomRepository) AddMessageToChatroom(chatroomID uint, message model
 		return nil, err
 	}
 
-	// Insert a record into the message_views table for each user in the chatroom, except for the user who created the message
-	_, err = tx.Exec("INSERT INTO message_views (message_id, user_id) SELECT $1, user_id FROM chatroom_participants WHERE chatroom_id = $2 AND user_id != $3", newMessage.ID, chatroomID, message.SenderID)
-	if err != nil {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			return nil, fmt.Errorf("rollback failed: %v, original error: %v", rollbackErr, err)
-		}
-		return nil, err
-	}
-
-	// When a new message is added update the unread count for all participants in the chatroom except the sender
-	_, err = tx.Exec("UPDATE chatroom_participants SET unread_count = unread_count + 1 WHERE chatroom_id = $1 AND user_id != $2", chatroomID, message.SenderID)
-	if err != nil {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			return nil, fmt.Errorf("rollback failed: %v, original error: %v", rollbackErr, err)
-		}
-		return nil, err
-	}
-
 	err = tx.Commit()
 	if err != nil {
 		return nil, err
@@ -266,7 +249,7 @@ func (r *ChatroomRepository) AddMessageToChatroom(chatroomID uint, message model
 
 	return &newMessage, nil
 }
-
+// AddMessageToChatroomTx adds a message to a chatroom in a transaction. It also updates the unread count for all participants in the chatroom except the sender.
 func (r *ChatroomRepository) AddMessageToChatroomTx(tx *sql.Tx, chatroomID uint, message model.ChatMessage) (model.ChatMessage, error) {
 	// Check if chatroom exists
 	var exists bool
@@ -293,52 +276,26 @@ func (r *ChatroomRepository) AddMessageToChatroomTx(tx *sql.Tx, chatroomID uint,
 		newMessage.AttachmentURL = attachmentURL.String
 	}
 
+	// Insert a record into the message_views table for each user in the chatroom, except for the user who created the message
+	_, err = tx.Exec("INSERT INTO message_views (message_id, user_id) SELECT $1, user_id FROM chatroom_participants WHERE chatroom_id = $2 AND user_id != $3", newMessage.ID, chatroomID, message.SenderID)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return model.ChatMessage{}, fmt.Errorf("rollback failed: %v, original error: %v", rollbackErr, err)
+		}
+		return model.ChatMessage{}, err
+	}
+
+	// When a new message is added update the unread count for all participants in the chatroom except the sender
+	_, err = tx.Exec("UPDATE chatroom_participants SET unread_count = unread_count + 1 WHERE chatroom_id = $1 AND user_id != $2", chatroomID, message.SenderID)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return model.ChatMessage{}, fmt.Errorf("rollback failed: %v, original error: %v", rollbackErr, err)
+		}
+		return model.ChatMessage{}, err
+	}
+
 	return newMessage, nil
 }
-
-//func (r *ChatroomRepository) MarkMessageAsViewedTx(tx *sql.Tx, messageID uint) (model.ChatMessage, error) {
-//	query := `
-//		UPDATE messages
-//		SET viewed = true
-//		WHERE id = $1
-//		RETURNING id, chatroom_id, sender_user_id, text, attachment_url, timestamp, viewed, deleted, edited
-//	`
-//	var message model.ChatMessage
-//	var attachmentURL sql.NullString
-//	err := tx.QueryRow(query, messageID).Scan(
-//		&message.ID, &message.ChatroomID, &message.SenderID, &message.Text, &attachmentURL, &message.TimeStamp, &message.Viewed, &message.Deleted, &message.Edited)
-//	if err != nil {
-//		return model.ChatMessage{}, fmt.Errorf("failed to mark the message as viewed: %v", err)
-//	}
-//	if attachmentURL.Valid {
-//		message.AttachmentURL = attachmentURL.String
-//	}
-//
-//	return message, nil
-//}
-//
-//func (r *ChatroomRepository) MarkMessageAsViewed(messageID uint) (*model.ChatMessage, error) {
-//	tx, err := r.db.Begin()
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	message, err := r.MarkMessageAsViewedTx(tx, messageID)
-//	if err != nil {
-//		err := tx.Rollback()
-//		if err != nil {
-//			return nil, fmt.Errorf("rollback failed: %v, original error: %v", err, err)
-//		}
-//		return nil, fmt.Errorf("failed to mark the message as viewed: %v", err)
-//	}
-//
-//	err = tx.Commit()
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return &message, nil
-//}
 
 // CreatePrivateChatroom Create private chatroom between two users returning the newly created chatroom
 func (r *ChatroomRepository) CreatePrivateChatroom(user1ID, user2ID uint) (*model.Chatroom, error) {

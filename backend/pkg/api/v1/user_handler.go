@@ -4,8 +4,9 @@ import (
 	"backend/pkg/model"
 	"backend/pkg/service"
 	"fmt"
-	"github.com/gofiber/fiber/v2"
 	"strconv"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // GetUsers fetches all users
@@ -74,8 +75,15 @@ func SearchUsers(userService *service.UserService) fiber.Handler {
 		if searchTerm == "" {
 			return c.JSON([]model.User{})
 		}
-
-		users, err := userService.GetUsersBySearchTerm(searchTerm)
+		userIDRaw := c.Locals("userID")
+		userID, ok := userIDRaw.(uint)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "userID not found in context",
+			})
+		}
+		excludedUsers := []uint{userID}
+		users, err := userService.GetUsersBySearchTerm(searchTerm, excludedUsers)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": fmt.Sprintf("Error searching users: %v", err)})
 		}

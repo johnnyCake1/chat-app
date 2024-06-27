@@ -28,8 +28,8 @@ func (us *UserService) GetUserByEmail(email string) (*model.User, error) {
 }
 
 // GetUsersBySearchTerm finds those users whose nickname or email contains the search term. Returns empty array if no user is found.
-func (us *UserService) GetUsersBySearchTerm(searchTerm string) ([]model.User, error) {
-	return us.userRepo.FindUserBySearchTerm(searchTerm)
+func (us *UserService) GetUsersBySearchTerm(searchTerm string, excludedUsers []uint) ([]model.User, error) {
+	return us.userRepo.FindUserBySearchTerm(searchTerm, excludedUsers)
 }
 
 func (us *UserService) CreateNewUser(user model.User) (model.User, error) {

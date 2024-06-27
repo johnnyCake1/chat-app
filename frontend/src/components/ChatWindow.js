@@ -4,8 +4,7 @@ import './ChatWindow.css';
 import { Navigate } from 'react-router-dom';
 import { API_URL, MessageOptions } from '../constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckDouble } from '@fortawesome/free-solid-svg-icons';
-import { faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faCheckDouble, faCheck } from '@fortawesome/free-solid-svg-icons';
 import useLocalStorageState from '../util/userLocalStorage';
 
 const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
@@ -19,6 +18,7 @@ const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
     if (!conversation) {
       return;
     }
+
     const markMessageAsViewed = (messageId) => {
       console.log("Marking message as viewed:", messageId);
       // convert messageId string to uint
@@ -27,7 +27,6 @@ const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
         console.error("No connection with the server");
         return;
       }
-      console.log("convo id:", conversation.id, "message id:", messageId, "viewer id:", currentUser.id)
       ws.send(JSON.stringify({
         messageOption: MessageOptions.VIEW_MESSAGE,
         viewMessage: {
@@ -36,7 +35,6 @@ const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
           viewerID: currentUser.id
         }
       }));
-      console.log("Marking message as viewed:", messageId);
     };
     // Clear the messageRefs array when the conversation changes
     messageRefs.current = messageRefs.current.slice(0, conversation.messages.length);
@@ -48,6 +46,7 @@ const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
             // Mark the message as viewed when it enters the viewport
             const messageID = entry.target.getAttribute('data-id');
             markMessageAsViewed(messageID);
+            observer.unobserve(entry.target); // Unobserve after marking as viewed
           }
         });
       },
@@ -88,13 +87,11 @@ const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
       return [];
     }).then(responseData => {
       console.log("Loaded messages:", responseData);
-      // Filter out the messages that already exist in the conversation to make sure we don't add duplicates
       const newMessages = responseData.filter(
         (newMessage) => !conversation.messages.some(
           (existingMessage) => existingMessage.id === newMessage.id
         )
       );
-      // Append the new messages to the start of the conversation
       conversation.messages = [...newMessages, ...conversation.messages];
       setConversation(conversation);
       setPage(prevPage => prevPage + 1);
@@ -119,7 +116,6 @@ const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
       };
 
       if (conversation.id) {
-        // If conversation exists, send message to the conversation
         messageData.messageOption = MessageOptions.SEND_MESSAGE;
         messageData.sendMessage = {
           senderID: currentUser.id,
@@ -127,7 +123,6 @@ const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
           text: messageInput,
         };
       } else {
-        // If conversation doesn't exist, create a new private chatroom
         messageData.messageOption = MessageOptions.CREATE_PRIVATE_CHATROOM;
         messageData.createPrivateChatroom = {
           participants: conversation.participants,
@@ -172,10 +167,9 @@ const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
           </Button>
         </Col>
       </Row>
-      {/* <Row className="message-list" ref={messageListRef}> */}
       <Row className="message-list">
         <Col>
-          {(conversation.messages.length > 0 && conversation.messages.map((message, idx) => (
+          {conversation.messages.length > 0 ? conversation.messages.map((message, idx) => (
             <div
               key={idx}
               className={`message ${message.senderID === currentUser.id ? 'sent' : 'received'}`}
@@ -191,10 +185,9 @@ const ChatWindow = ({ conversation, setConversation, ws, currentUser }) => {
                 <FontAwesomeIcon icon={message.viewed ? faCheckDouble : faCheck} />
               </div>
             </div>
-          )))
-            ||
+          )) : (
             <div className="empty-chat">No messages yet. Say hello to {conversation.conversationName}</div>
-          }
+          )}
         </Col>
       </Row>
       <Row className="input-box">
